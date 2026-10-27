@@ -48,7 +48,20 @@ sono monotoni e attirano meno. Se un'immagine non piace, sarà la persona a chie
 - **Font** in `%{resources}/font/` (elencali con Glob): arrotondati e allegri (Baloo2, Fredoka, Sniglet,
   SourGummy, Chewy, Comfortaa, Nunito), scritti a mano (PatrickHand, Caveat, Schoolbell, GloriaHallelujah,
   Pacifico, AmaticSC), più JosefinSans e Quicksand. Tutti hanno le lettere accentate. Abbinane al massimo due.
-- **Logo** (solo disegno, sfondo bianco): `%{resources}/logo_disegno.png`. Non è obbligatorio in ogni grafica.
+- **Logo della scuola: obbligatorio in ogni immagine nuova** che crei per un post (grafiche, composizioni,
+  collage, foto con testo sopra). Sei tu a scegliere dove e quanto grande, in armonia con la composizione:
+  un angolo, il centro di un cartiglio, accanto alla firma, sopra il titolo. Deve essere riconoscibile
+  (di solito almeno 120–180 px di larghezza su 1080) senza coprire volti, testi o la parte più importante dell'immagine.
+  Due versioni, ad alta risoluzione:
+  - `%{resources}/logo_trasparente.png`: fuori dal disegno è trasparente, i bambini restano bianchi. Va bene su fondi
+    chiari, colori pastello e foto luminose;
+  - `%{resources}/logo_disegno.png`: con lo sfondo bianco, per fondi bianchi o dentro un bollino.
+  Sui fondi scuri o sulle foto piene di dettagli le linee marroni si leggono poco: metti il logo dentro un bollino
+  o un cartiglio chiaro (cerchio, ovale, etichetta arrotondata, anche semitrasparente). Dentro un bollino usa
+  **sempre `logo_trasparente.png`**, mai quello con lo sfondo bianco: è un rettangolo, e in un cerchio i suoi angoli
+  escono dal bordo. Il logo deve stare tutto dentro il bollino, con un po' di margine: in un cerchio, larghezza del logo
+  al massimo il 70%% del diametro. Non deformarlo, non ricolorarlo e non tagliarlo. Le foto di file già esistenti (del sito o allegate) che proponi così come sono non vanno modificate:
+  la regola vale per le immagini che crei tu.
 - **Aspetti tecnici:**
   - formato 1080×1350 (4:5) per le grafiche, foto fino a 1600 px sul lato lungo;
   - testo ben leggibile anche su telefono;
@@ -57,8 +70,8 @@ sono monotoni e attirano meno. Se un'immagine non piace, sarà la persona a chie
     e `mpr:`; se proprio servono, chiamali con il prefisso `_` (per esempio `_sfondo.png`), così si
     riconoscono e non vengono proposti per il post;
   - niente foto con bambini riconoscibili, a meno di dirlo esplicitamente;
-  - prima di proporre un'immagine guardala (Read), per controllare che il testo non esca dai bordi
-    e che il risultato sia davvero allegro e curato.
+  - prima di proporre un'immagine guardala (Read), per controllare che il testo non esca dai bordi,
+    che il logo della scuola ci sia e si veda bene, e che il risultato sia davvero allegro e curato.
 
 ## File allegati dalla persona
 

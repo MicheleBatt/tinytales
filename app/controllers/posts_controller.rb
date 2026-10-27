@@ -66,11 +66,11 @@ class PostsController < ApplicationController
     warnings = PostSync.new(@post).destroy!
     redirect_to back_path || posts_path, notice: "Post «#{@post.title}» eliminato, anche dai social.", flash: { warnings: }, status: :see_other
   rescue PostSync::Error => error
-    redirect_to back_path || @post, alert: "Il post non è stato eliminato. #{error.message}", status: :see_other
+    fail_with("Il post non è stato eliminato. #{error.message}", title: "Eliminazione non riuscita")
   end
 
   def publish
-    sync(notice: "Post pubblicato sui social.") { |s| s.publish! }
+    sync(notice: "Post pubblicato sui social.", failure: "Pubblicazione non riuscita") { |s| s.publish! }
   end
 
   # Dalla finestra di conferma può arrivare una nuova data (publish_at): vale per Facebook e per l'app.
@@ -78,15 +78,15 @@ class PostsController < ApplicationController
   def schedule
     if params[:publish_at].present?
       time = Time.zone.parse(params[:publish_at].to_s) rescue nil
-      return redirect_to(back_path || @post, alert: "La data scelta non è valida.", status: :see_other) unless time
+      return fail_with("La data scelta non è valida.", title: "Programmazione non riuscita") unless time
 
       @post.publish_at = time
     end
-    sync(notice: "Post programmato sui social per #{I18n.l(@post.publish_at, format: :long)}.") { |s| s.schedule! }
+    sync(notice: "Post programmato sui social per #{I18n.l(@post.publish_at, format: :long)}.", failure: "Programmazione non riuscita") { |s| s.schedule! }
   end
 
   def unpublish
-    sync(notice: "Post tolto dai social: nell'app è di nuovo una bozza.") { |s| s.unpublish! }
+    sync(notice: "Post tolto dai social: nell'app è di nuovo una bozza.", failure: "Rimozione dai social non riuscita") { |s| s.unpublish! }
   end
 
   # Riprova a riportare sui social l'ultima versione del post, dopo un errore.
@@ -128,13 +128,24 @@ class PostsController < ApplicationController
     @month_count = @calendar_posts.select { |day, _| day.month == @month.month }.values.sum(&:size)
   end
 
-  def sync(notice:)
+  def sync(notice:, failure: "L'azione non è riuscita")
     warnings = yield PostSync.new(@post)
     redirect_to back_path || @post, notice:, flash: { warnings: }, status: :see_other
   rescue PostSync::Error => error
-    redirect_to back_path || @post, alert: error.message, status: :see_other
+    fail_with(error.message, title: failure)
   rescue ActiveRecord::RecordInvalid => error
-    redirect_to back_path || @post, alert: "Il post non è completo: #{error.record.errors.full_messages.to_sentence}.", status: :see_other
+    fail_with("Il post non è completo: #{error.record.errors.full_messages.to_sentence}.", title: failure)
+  end
+
+  # Un'azione non riuscita. Dalla pagina del post: la solita striscia d'avviso.
+  # Dal popup del calendario (return_to): si torna al calendario e l'errore compare in una finestra a sé.
+  def fail_with(message, title:)
+    if (back = back_path)
+      redirect_to back, flash: { errore_popup: { "titolo" => title, "messaggio" => message, "post" => post_path(@post),
+                                                 "post_titolo" => @post.title } }, status: :see_other
+    else
+      redirect_to @post, alert: message, status: :see_other
+    end
   end
 
   # Dove tornare dopo un'azione lanciata dal popup del calendario: solo l'elenco dei post di questa app.

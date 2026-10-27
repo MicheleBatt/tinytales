@@ -1,10 +1,13 @@
 require "test_helper"
 
 class AssistantTest < ActionDispatch::IntegrationTest
+  include ActiveJob::TestHelper
   # Al posto di Claude Code: risponde con una proposta e registra cosa ha ricevuto.
+  # Con FakeRunner.creates = { "nome.png" => "contenuto" } scrive anche dei file nella cartella di lavoro.
   class FakeRunner
     cattr_accessor :last
-    attr_reader :conversation, :form_state, :attachments
+    cattr_accessor :creates, default: {}
+    attr_reader :conversation, :form_state, :attachments, :seen
 
     def initialize(conversation, form_state: {})
       @conversation = conversation
@@ -14,6 +17,8 @@ class AssistantTest < ActionDispatch::IntegrationTest
 
     def run(message, attachments: [])
       @attachments = attachments
+      @seen = @conversation.outbox.children.map { |path| [ path.basename.to_s, path.read ] }.sort.to_h
+      creates.each { |name, content| @conversation.outbox.join(name).write(content) }
       yield({ type: "activity", text: "Leggo mensa.html" })
       yield({ type: "delta", text: "Ecco: " })
       yield({ type: "delta", text: "```proposta:titolo\n#{message.upcase}\n```" })
@@ -116,14 +121,61 @@ class AssistantTest < ActionDispatch::IntegrationTest
     assert_response :success
 
     conversation = AssistantConversation.find_by!(token: @token)
-    assert_equal "Bozza del post", conversation.outbox.join("bozza_post.txt").read
-    assert conversation.outbox.join("foto.jpg").file?
+    assert_equal "Bozza del post", FakeRunner.last.seen["bozza_post.txt"], "durante la risposta Claude li trova nella cartella"
+    assert FakeRunner.last.seen.key?("foto.jpg")
     assert_equal %w[bozza_post.txt foto.jpg], FakeRunner.last.attachments.map { |a| a["name"] }
-    assert_equal %w[testo immagine], conversation.messages.first.attachments.map { |a| a["kind"] }
-    assert_equal "bozza post.txt", conversation.messages.first.attachments.first["original"]
+    user_message = conversation.messages.first
+    assert_equal %w[testo immagine], user_message.attachments.map { |a| a["kind"] }
+    assert_equal "bozza post.txt", user_message.attachments.first["original"]
+
+    assert_equal %w[bozza_post.txt foto.jpg], user_message.files.map { |f| f.filename.to_s }.sort, "salvati in Active Storage"
+    assert_equal "Bozza del post", user_message.files.find { |f| f.filename.to_s == "bozza_post.txt" }.download
+    assert_empty Dir.glob(AssistantConversation::OUTBOX_ROOT.join(@token, "*")), "a fine risposta la cartella si svuota"
 
     get assistant_file_path(token: @token, name: "bozza_post.txt")
-    assert_response :success
+    assert_response :redirect
+    assert_match %r{/rails/active_storage/}, response.location
+  end
+
+  test "le immagini create da Claude si salvano sul suo messaggio, senza i file intermedi, e tornano alla risposta dopo" do
+    FakeRunner.creates = { "grafica.png" => "PNG-1", "_sfondo.png" => "intermedio", "disegno.sh" => "convert …" }
+    post assistant_messages_path, params: { token: @token, message: "Fammi una grafica" }
+    conversation = AssistantConversation.find_by!(token: @token)
+    reply = conversation.messages.last
+    assert_equal "assistant", reply.role
+    assert_equal %w[grafica.png], reply.files.map { |f| f.filename.to_s }
+    assert_empty Dir.glob(conversation.outbox.join("*"))
+
+    get assistant_file_path(token: @token, name: "grafica.png")
+    assert_response :redirect
+
+    # Risposta successiva: Claude ritrova la grafica e la rifà con lo stesso nome; vale la nuova.
+    FakeRunner.creates = { "grafica.png" => "PNG-2" }
+    post assistant_messages_path, params: { token: @token, message: "Più luminosa" }
+    assert_equal "PNG-1", FakeRunner.last.seen["grafica.png"]
+    assert_equal "PNG-2", conversation.reload.file_attachment("grafica.png").download
+
+    # Risposta senza cambiamenti: la grafica non viene salvata di nuovo.
+    FakeRunner.creates = {}
+    assert_no_difference -> { ActiveStorage::Attachment.where(record_type: "AssistantMessage").count } do
+      post assistant_messages_path, params: { token: @token, message: "Va bene così" }
+    end
+    assert_equal "PNG-2", FakeRunner.last.seen["grafica.png"]
+  ensure
+    FakeRunner.creates = {}
+  end
+
+  test "cancellando la conversazione spariscono anche i suoi file" do
+    FakeRunner.creates = { "grafica.png" => "PNG" }
+    post assistant_messages_path, params: { token: @token, message: "Fammi una grafica" }
+    conversation = AssistantConversation.find_by!(token: @token)
+    blob = conversation.messages.last.files.first.blob
+
+    perform_enqueued_jobs { conversation.destroy }
+    assert_not ActiveStorage::Blob.exists?(blob.id)
+    assert_not AssistantConversation::OUTBOX_ROOT.join(@token).exist?
+  ensure
+    FakeRunner.creates = {}
   end
 
   test "un allegato con lo stesso nome non sovrascrive quello di prima" do
@@ -131,9 +183,9 @@ class AssistantTest < ActionDispatch::IntegrationTest
       file = Rack::Test::UploadedFile.new(StringIO.new("versione #{i}"), "text/plain", original_filename: "bozza.txt")
       post assistant_messages_path, params: { token: @token, message: "ecco", files: [ file ] }
     end
-    outbox = AssistantConversation.find_by!(token: @token).outbox
-    assert_equal "versione 0", outbox.join("bozza.txt").read
-    assert_equal "versione 1", outbox.join("bozza-2.txt").read
+    conversation = AssistantConversation.find_by!(token: @token)
+    assert_equal "versione 0", conversation.file_attachment("bozza.txt").download
+    assert_equal "versione 1", conversation.file_attachment("bozza-2.txt").download
   end
 
   test "si può mandare solo un file, senza testo" do

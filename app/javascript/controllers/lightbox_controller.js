@@ -53,6 +53,7 @@ export default class extends Controller {
   decorate() {
     this.element.querySelectorAll("[data-lightbox]:not([data-scaricabile])").forEach((trigger) => {
       if (trigger.hidden || trigger.closest(".lightbox")) return
+      if (trigger.dataset.lightboxScarica === "no") return // miniature troppo piccole (elenco dei post)
       trigger.dataset.scaricabile = ""
       const button = this.downloadButton(trigger)
 

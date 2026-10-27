@@ -43,6 +43,7 @@
       <% if notice %><p class="avviso avviso-ok" role="status"><%= notice %></p><% end %>
       <% if alert %><p class="avviso avviso-ritardo" role="alert"><%= alert %></p><% end %>
       <% Array(flash[:warnings]).each do |warning| %><p class="avviso avviso-info" role="status"><%= warning %></p><% end %>
+      <% if (errore = flash[:errore_popup]).is_a?(Hash) %><%= render "shared/errore_popup", errore: %><% end %>
       <%= yield %>
     </main>
   </body>

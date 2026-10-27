@@ -26,4 +26,26 @@ namespace :assistant do
   rescue ActiveRecord::RecordNotFound
     abort "Nessun post con id #{ENV['ID']}."
   end
+
+  desc "Una volta sola: porta in Active Storage i file delle chat ancora nelle cartelle tmp/assistant/<token>"
+  task import_files: :environment do
+    AssistantConversation.find_each do |conversation|
+      next unless AssistantConversation::OUTBOX_ROOT.join(conversation.token).directory?
+
+      imported, skipped = conversation.import_legacy_files!
+      puts "#{conversation.token} (post #{conversation.post_id || "nuovo"}): #{imported.size} file importati" \
+           "#{", tralasciati: #{skipped.sort.join(", ")}" if skipped.any?}"
+    end
+  end
+
+  desc "Cancella le chat di post nuovi mai salvati, più vecchie di GIORNI (predefinito 14), con i loro file"
+  task cleanup: :environment do
+    days = Integer(ENV.fetch("GIORNI", "14"))
+    old = AssistantConversation.where(post_id: nil).where(updated_at: ...days.days.ago)
+    puts "Chat senza post più vecchie di #{days} giorni: #{old.count}"
+    old.find_each do |conversation|
+      puts "- #{conversation.token}, ultima attività #{I18n.l(conversation.updated_at, format: :short)}"
+      conversation.destroy!
+    end
+  end
 end

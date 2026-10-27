@@ -17,3 +17,6 @@ module ActiveSupport
     end
   end
 end
+
+# I file caricati durante i test (Active Storage del test, in tmp/storage) non servono dopo: via a fine esecuzione.
+Minitest.after_run { FileUtils.rm_rf(Dir.glob(Rails.root.join("tmp/storage/*"))) }

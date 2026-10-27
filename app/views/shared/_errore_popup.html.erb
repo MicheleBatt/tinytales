@@ -1,0 +1,19 @@
+<%# Finestra d'errore per un'azione lanciata dal popup del calendario (vedi PostsController#fail_with).
+    Si apre da sola al caricamento della pagina (controller auto-dialog). %>
+<dialog class="conferma conferma-pericolo errore-popup" data-controller="auto-dialog" aria-labelledby="errore-popup-titolo"
+        aria-describedby="errore-popup-messaggio">
+  <header class="conferma-testa">
+    <h2 id="errore-popup-titolo"><%= errore["titolo"] %></h2>
+    <button type="button" class="proposte-chiudi" data-action="auto-dialog#close" aria-label="Chiudi">×</button>
+  </header>
+  <p class="conferma-messaggio" id="errore-popup-messaggio">
+    <% if errore["post_titolo"].present? %><strong>«<%= errore["post_titolo"] %>»</strong><br><% end %>
+    <%= errore["messaggio"] %>
+  </p>
+  <footer class="conferma-piede">
+    <% if errore["post"].present? %>
+      <%= link_to "Apri il post", errore["post"], class: "bottone" %>
+    <% end %>
+    <button type="button" class="bottone bottone-principale" data-action="auto-dialog#close" autofocus>Chiudi</button>
+  </footer>
+</dialog>

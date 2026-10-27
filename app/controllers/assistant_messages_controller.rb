@@ -17,10 +17,12 @@ class AssistantMessagesController < ApplicationController
              status: :unprocessable_content
     else
       conversation = find_conversation
+      known = conversation.prepare_outbox! # i file già salvati della chat, per Claude
       attachments = store_uploads(conversation, uploads)
-      stream_reply(conversation, message.presence || "Ti allego questi file.", attachments)
+      stream_reply(conversation, message.presence || "Ti allego questi file.", attachments, known)
     end
   rescue AssistantConversation::UploadError => error
+    conversation&.clear_outbox!
     render json: { error: error.message }, status: :unprocessable_content
   end
 
@@ -36,8 +38,14 @@ class AssistantMessagesController < ApplicationController
     raise
   end
 
-  def stream_reply(conversation, message, attachments)
-    conversation.messages.create!(role: "user", content: message, attachments:)
+  def stream_reply(conversation, message, attachments, known)
+    user_message = conversation.messages.create!(role: "user", content: message, attachments:)
+    # Gli allegati restano nella cartella di lavoro per Claude, e si salvano sul messaggio della persona.
+    attachments.each do |attachment|
+      path = conversation.outbox.join(attachment["name"])
+      path.open { |io| user_message.files.attach(io:, filename: attachment["name"], content_type: Marcel::MimeType.for(path)) }
+      known[attachment["name"]] = Digest::MD5.file(path).base64digest
+    end
 
     response.headers["Content-Type"] = "application/x-ndjson"
     response.headers["Cache-Control"] = "no-cache"
@@ -53,8 +61,20 @@ class AssistantMessagesController < ApplicationController
     runner&.stop
     reply << "\n\n_(risposta interrotta)_" if reply.present?
   ensure
-    conversation&.messages&.create!(role: "assistant", content: reply) if reply.present?
+    save_reply(conversation, reply, known) if conversation
     response.stream.close
+  end
+
+  # La risposta di Claude, con le immagini nuove o modificate nella cartella di lavoro; poi la cartella si svuota.
+  def save_reply(conversation, reply, known)
+    message = conversation.messages.new(role: "assistant", content: reply.presence || "_(nessuna risposta)_")
+    if reply.present? || conversation.outbox.children.any?
+      message.save!
+      conversation.collect_outbox!(message, known || {})
+      message.destroy if reply.blank? && message.files.reload.none? # niente da conservare
+    end
+  ensure
+    conversation.clear_outbox!
   end
 
   # La conversazione si riconosce dal token; per un post salvato si lega al post.

@@ -35,8 +35,11 @@ Database PostgreSQL `tinytales_development`, sul server locale con l'utente di s
   Per un nuovo social si aggiunge la piattaforma in `SocialPage::PLATFORMS` e si crea la pagina.
 - **publications**: su quali pagine esce ogni post, con l'id del post sul social, i file inviati e l'ultimo errore.
 
-I file allegati stanno in `storage/`, fuori da git: **database e `storage/` vanno salvati insieme**
-per un backup completo (per il database: `pg_dump tinytales_development`).
+I file allegati ai post e quelli delle chat con Claude stanno in `storage/` (Active Storage), fuori da git:
+**database e `storage/` vanno salvati insieme** per un backup completo (per il database: `pg_dump tinytales_development`).
+- **assistant_conversations** / **assistant_messages**: le chat con Claude, una per post (o per un post nuovo non ancora
+  salvato). Ogni messaggio ha i suoi file (`has_many_attached :files`): gli allegati della persona, o le immagini create
+  da Claude. Cancellando un post si cancellano anche la sua chat e i suoi file.
 
 ## Pagine
 
@@ -147,9 +150,14 @@ nel database, una per post, e si ritrova riaprendo il post. Quella di un post nu
     nessuna chiave o password di altri progetti).
   - **Escluso:** niente git, niente modifiche a sito o app, niente pubblicazione sui social.
 - **Allegati:** con «📎 Allega», o trascinandoli sulla chat, si mandano a Claude testi (`.txt`, `.md`, `.csv`), PDF,
-  immagini e video, fino a 10 file per messaggio e 100 MB ciascuno. Finiscono nella cartella di lavoro della chat;
+  immagini e video, fino a 10 file per messaggio e 100 MB ciascuno. Si salvano sul messaggio e, durante la risposta, stanno nella cartella di lavoro;
   Claude legge testi, PDF e immagini e può proporre immagini e video per il post. Niente Word: va copiato il testo
   o salvato in PDF. Se un file non va bene, il messaggio non parte e non resta niente.
+- **File della chat:** Claude lavora su file veri. Prima di ogni risposta la cartella di lavoro `tmp/assistant/<token>/`
+  viene preparata con i file già salvati della chat (così Claude può riprendere e modificare un'immagine di prima);
+  dopo la risposta le immagini nuove o modificate si salvano sul messaggio di Claude e la cartella si svuota.
+  Script e file intermedi (con il prefisso `_`) non si conservano. Pulizia delle chat di post nuovi mai salvati:
+  `bin/rails assistant:cleanup` (quelle ferme da più di 14 giorni; `GIORNI=30` per cambiare).
 - **Cosa sa fare:** testi; grafiche composte con ImageMagick da foto, logo e locandine della scuola
   (17 font liberi di Google Fonts in `lib/assistant/risorse/font/`, logo in `lib/assistant/risorse/`).
   Unico vincolo di stile: un tono vivace e gioioso, adatto a una scuola dell'infanzia; per il resto le grafiche

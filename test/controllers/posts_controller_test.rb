@@ -1,6 +1,7 @@
 require "test_helper"
 
 class PostsControllerTest < ActionDispatch::IntegrationTest
+  include ActionView::RecordIdentifier
   test "l'elenco mostra tutti i post, prima quelli senza data e poi dal più recente" do
     get posts_path
     assert_response :success
@@ -72,6 +73,16 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
     cookies[:vista_post] = "calendario"
     get posts_path, params: { mese: "pippo" }
     assert_select ".calendario-mese", I18n.l(Date.current, format: "%B %Y").upcase_first
+  end
+
+  test "nell'elenco la miniatura apre l'anteprima a tutto schermo, con tutti i file del post" do
+    post = posts(:mensa)
+    2.times { |i| post.media.attach(io: file_fixture("sample.jpg").open, filename: "foto_#{i + 1}.jpg", content_type: "image/jpeg") }
+
+    get posts_path
+    assert_select "##{dom_id(post)} .riga-miniatura[data-lightbox][data-lightbox-group='elenco-#{post.id}'][data-lightbox-scarica=no]", 1
+    assert_select "##{dom_id(post)} .riga-miniatura span[hidden][data-lightbox-group='elenco-#{post.id}'][data-lightbox-caption='foto_2.jpg']", 1
+    assert_select "##{dom_id(posts(:promemoria))} .riga-miniatura[data-lightbox]", 0, "senza file la miniatura non apre niente"
   end
 
   test "il filtro per data include tutto l'ultimo giorno" do

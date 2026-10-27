@@ -280,4 +280,28 @@ class PostStatusTest < ActionDispatch::IntegrationTest
     get edit_post_path(posts(:mensa))
     assert_select "form.modulo:not([data-busy-message])"
   end
+
+  test "un errore di Facebook su un'azione dal popup del calendario compare in una finestra a sé" do
+    @facebook.fail_on(:post, %r{/feed\z}, "Token scaduto")
+    back = "/posts?vista=calendario&mese=2026-11"
+    patch schedule_post_path(posts(:mensa)), params: { return_to: back }
+
+    assert_redirected_to back
+    assert posts(:mensa).reload.draft?
+    follow_redirect!
+    assert_select "dialog.errore-popup[data-controller=auto-dialog]" do
+      assert_select "h2", "Programmazione non riuscita"
+      assert_select ".conferma-messaggio", /La nostra mensa.*Token scaduto/m
+      assert_select "a[href='#{post_path(posts(:mensa))}']", "Apri il post"
+    end
+    assert_select ".avviso-ritardo", 0, "niente striscia: l'errore è nella finestra"
+  end
+
+  test "dalla pagina del post gli errori restano nella striscia d'avviso" do
+    @facebook.fail_on(:post, %r{/feed\z}, "Token scaduto")
+    patch schedule_post_path(posts(:mensa))
+    follow_redirect!
+    assert_select ".avviso-ritardo", /Token scaduto/
+    assert_select "dialog.errore-popup", 0
+  end
 end
