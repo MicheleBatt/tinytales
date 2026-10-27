@@ -7,8 +7,10 @@ require "open3"
 #   { type: "done", error: }      fine della risposta
 #
 # Claude parte dalla cartella del sito, così carica memoria e convenzioni del progetto.
-# Può leggere sito, app e memoria; può scrivere solo nella cartella di lavoro della chat;
-# da Bash può usare solo ImageMagick e i comandi di sola lettura `bin/rails assistant:*`.
+# Può leggere solo sito, app e memoria (non i segreti dell'app: chiavi e credenziali);
+# può scrivere solo nella cartella di lavoro della chat;
+# da Bash può usare solo ImageMagick (con regole che gli permettono di leggere le stesse cartelle
+# e di scrivere solo nella cartella di lavoro) e i comandi di sola lettura `bin/assistant`.
 class AssistantRunner
   CLAUDE = ENV.fetch("CLAUDE_BIN", File.expand_path("~/.local/bin/claude"))
   SITE_ROOT = Pathname(ENV.fetch("ASSISTANT_SITE_ROOT", "/home/michele/Progetti/scuola-infanzia-creola"))
@@ -17,6 +19,17 @@ class AssistantRunner
   INSTRUCTIONS = Rails.root.join("lib/assistant/istruzioni.md")
   ASSISTANT_BIN = Rails.root.join("bin/assistant").to_s
   IMAGE_TOOLS = %w[convert magick montage composite identify].freeze
+  # File dell'app che Claude non deve mai leggere: decifrano le credenziali (token di Facebook compreso).
+  # Anche i log, che non gli servono e possono contenere dettagli delle richieste.
+  SECRETS = %w[config/*.key config/credentials* config/credentials/** .env* log/**].freeze
+  POLICY_ROOT = Rails.root.join("tmp/imagemagick")
+  # Gli unici strumenti di Claude: niente web, sotto-agenti, notebook o skill.
+  TOOLS = %w[Read Glob Grep Edit Write Bash].freeze
+  # Le sole variabili d'ambiente che passano a Claude: quelle per funzionare e per avviare Ruby (bin/assistant).
+  # Tutte le altre (chiavi, password, token di altri progetti) restano fuori.
+  ENV_KEEP = %w[HOME USER LOGNAME PATH SHELL TERM LANG LANGUAGE TZ TMPDIR RAILS_ENV
+                GEM_HOME GEM_PATH MY_RUBY_HOME RUBY_VERSION IRBRC].freeze
+  ENV_KEEP_PREFIXES = %w[LC_ rvm_ ANTHROPIC_ CLAUDE_CONFIG_DIR].freeze
   TIMEOUT = 15.minutes
 
   def initialize(conversation, form_state: {})
@@ -26,17 +39,82 @@ class AssistantRunner
 
   def command
     # Nelle regole di Claude Code un percorso assoluto si scrive con due barre iniziali: Edit(//home/...).
-    allowed = [ "Read", "Glob", "Grep", "Edit(/#{@conversation.outbox}/**)" ] +
+    allowed = readable_roots.map { |root| "Read(/#{root}/**)" } +
+              [ "Glob", "Grep", "Edit(/#{@conversation.outbox}/**)" ] +
               IMAGE_TOOLS.map { |tool| "Bash(#{tool}:*)" } +
               [ "Bash(#{ASSISTANT_BIN}:*)" ]
+    denied = SECRETS.flat_map { |pattern| [ "Read(/#{Rails.root}/#{pattern})", "Edit(/#{Rails.root}/#{pattern})" ] } +
+             [ "Read(/#{SITE_ROOT}/.env*)" ] +
+             outside_paths.flat_map { |path| [ "Read(/#{path})", "Read(/#{path}/**)" ] } +
+             [ "Read(/#{MEMORY_DIR.parent}/*.jsonl)" ] # le trascrizioni delle sessioni, anche quelle nuove
 
     cmd = [ CLAUDE, "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
             "--permission-mode", "default", "--max-turns", "40",
+            # Nessuna impostazione esterna (i permessi accumulati nelle impostazioni del sito e della home,
+            # hook, plugin), nessun connettore MCP dell'account, solo gli strumenti elencati, niente skill.
+            "--setting-sources", "", "--strict-mcp-config", "--tools", TOOLS.join(","), "--disable-slash-commands",
             "--append-system-prompt", system_prompt,
             "--add-dir", Rails.root.to_s, "--add-dir", @conversation.outbox.to_s ]
     cmd += [ "--add-dir", MEMORY_DIR.to_s ] if MEMORY_DIR.directory?
     cmd += [ "--resume", @conversation.claude_session_id ] if @conversation.claude_session_id.present?
-    cmd + [ "--allowedTools", *allowed ]
+    cmd + [ "--allowedTools", *allowed, "--disallowedTools", *denied ]
+  end
+
+  # L'ambiente di Claude: solo le variabili necessarie (senza quelle di Bundler dell'app e senza DATABASE,
+  # che rompe alcuni comandi di Rails), più le regole di ImageMagick.
+  def claude_env
+    Bundler.unbundled_env
+           .select { |key, _| ENV_KEEP.include?(key) || ENV_KEEP_PREFIXES.any? { |prefix| key.start_with?(prefix) } }
+           .merge("MAGICK_CONFIGURE_PATH" => imagemagick_policy.to_s)
+  end
+
+  # Le cartelle che Claude può leggere: sito, app (tranne i segreti), memoria del progetto.
+  def readable_roots
+    [ SITE_ROOT, Rails.root, (MEMORY_DIR if MEMORY_DIR.directory?) ].compact.map(&:to_s)
+  end
+
+  # Tutto ciò che sta fuori dalle cartelle leggibili: i divieti valgono anche per Grep e Glob, che altrimenti
+  # cercherebbero ovunque. Si risale da ogni cartella leggibile fino alla home e, a ogni livello, si vieta
+  # quello che non porta a una cartella leggibile (altri progetti, file personali, ~/.ssh, trascrizioni di Claude…).
+  def outside_paths
+    roots = readable_roots.map { |root| Pathname(root) }
+    home = Pathname(Dir.home)
+    keep = roots.flat_map { |root| root.ascend.take_while { |dir| dir.to_s.start_with?(home.to_s) }.to_a }.uniq
+    parents = keep - roots
+    blocked = parents.flat_map do |dir|
+      next [] unless dir.directory?
+
+      dir.children.reject { |child| keep.include?(child) }
+    end
+    (blocked + %w[/tmp /media /mnt /root].map { |dir| Pathname(dir) }).map(&:to_s).sort
+  rescue SystemCallError
+    %w[/tmp /media /mnt /root]
+  end
+
+  # Regole per ImageMagick, che altrimenti potrebbe leggere qualsiasi file (anche come testo, con text:)
+  # e scrivere ovunque: legge solo sito, risorse e file dei post, e scrive solo nella cartella di lavoro.
+  # Il file sta fuori dalla cartella di lavoro, così Claude non può modificarlo.
+  def imagemagick_policy
+    dir = POLICY_ROOT.join(@conversation.outbox.basename.to_s).tap(&:mkpath)
+    temporary = dir.join("tmp").tap(&:mkpath) # i file temporanei di ImageMagick, al posto di /tmp
+    reads = [ SITE_ROOT, Rails.root.join("lib/assistant/risorse"), Rails.root.join("storage") ]
+    rules = [ %(<policy domain="coder" rights="none" pattern="{TEXT,TXT,URL,HTTP,HTTPS,FTP,EPHEMERAL,MSL}" />),
+              # PostScript, PDF e programmi esterni (Ghostscript, ffmpeg…): a Claude non servono.
+              %(<policy domain="coder" rights="none" pattern="{PS,PS2,PS3,EPS,EPI,EPSF,EPSI,EPT,PDF,PDFA,AI,XPS,SHOW,WIN,X}" />),
+              %(<policy domain="delegate" rights="none" pattern="*" />),
+              %(<policy domain="path" rights="none" pattern="/*" />) ] +
+            reads.map { |root| %(<policy domain="path" rights="read" pattern="#{root}/*" />) } +
+            [ %(<policy domain="resource" name="temporary-path" value="#{temporary}" />),
+              %(<policy domain="path" rights="read|write" pattern="#{temporary}/*" />),
+              %(<policy domain="path" rights="read|write" pattern="#{@conversation.outbox}/*" />),
+              %(<policy domain="path" rights="none" pattern="*.key" />),
+              %(<policy domain="path" rights="none" pattern="*credentials*" />),
+              %(<policy domain="path" rights="none" pattern="*/.env*" />),
+              # ImageMagick confronta il percorso così com'è scritto: senza questa regola
+              # «cartella-di-lavoro/../../public/x.png» passerebbe per la cartella di lavoro.
+              %(<policy domain="path" rights="none" pattern="*..*" />) ]
+    dir.join("policy.xml").write("<policymap>\n#{rules.map { |r| "  #{r}\n" }.join}</policymap>\n")
+    dir
   end
 
   def system_prompt
@@ -80,8 +158,7 @@ class AssistantRunner
   end
 
   def run(message, attachments: [])
-    # Senza le variabili di Bundler dell'app e senza DATABASE, che rompe alcuni comandi di Rails.
-    env = Bundler.unbundled_env.except("DATABASE")
+    env = claude_env
     parser = EventParser.new
 
     Open3.popen3(env, *command, chdir: SITE_ROOT.to_s, pgroup: true, unsetenv_others: true) do |stdin, stdout, stderr, wait|

@@ -111,6 +111,7 @@ class PostSuggestionBatch
 
   def discard!
     FileUtils.rm_rf(ROOT.join(token))
+    FileUtils.rm_rf(AssistantRunner::POLICY_ROOT.join(token)) # le regole di ImageMagick di questa sessione
   end
 
   private

@@ -130,10 +130,19 @@ nel database, una per post, e si ritrova riaprendo il post. Quella di un post nu
   `note`, `data` e `file`, che nella chat diventano riquadri con il pulsante **«Applica al form»**, o
   «Aggiungi al post» per i file. Poi si salva come sempre.
 - **Permessi** (in `AssistantRunner#command`):
-  - **Lettura:** file di sito, app e memoria.
-  - **Scrittura:** solo nella cartella di lavoro della chat, `tmp/assistant/<token>/`.
+  - **Lettura:** solo file di sito, app e memoria del progetto. Sono vietati i segreti dell'app (`config/*.key`,
+    `config/credentials*`, `.env*`) e tutto ciò che sta fuori da quelle tre cartelle (`AssistantRunner#outside_paths`),
+    anche per Grep e Glob.
+  - **Scrittura:** solo nella cartella di lavoro, `tmp/assistant/<token>/` (o `tmp/proposte/<token>/` per le proposte).
   - **Comandi:** da Bash solo ImageMagick (`convert`, `magick`, `montage`, `composite`, `identify`) e
     `bin/assistant posts` / `bin/assistant post ID`, che leggono il database senza modificarlo.
+    ImageMagick gira con regole proprie (`tmp/imagemagick/<token>/policy.xml`, generate a ogni avvio): legge solo sito,
+    risorse e file dei post, non trasforma file di testo in immagini e scrive solo nella cartella di lavoro.
+  - **Isolamento:** Claude parte senza nessuna impostazione esterna (`--setting-sources ""`: né i permessi accumulati
+    nelle impostazioni di Claude Code del sito o della home, né hook o plugin), senza i connettori MCP dell'account
+    (`--strict-mcp-config`), con i soli strumenti Read, Glob, Grep, Edit, Write e Bash (`--tools`: niente web,
+    sotto-agenti o skill) e con un ambiente ridotto alle variabili indispensabili (`AssistantRunner#claude_env`:
+    nessuna chiave o password di altri progetti).
   - **Escluso:** niente git, niente modifiche a sito o app, niente pubblicazione sui social.
 - **Allegati:** con «📎 Allega», o trascinandoli sulla chat, si mandano a Claude testi (`.txt`, `.md`, `.csv`), PDF,
   immagini e video, fino a 10 file per messaggio e 100 MB ciascuno. Finiscono nella cartella di lavoro della chat;
