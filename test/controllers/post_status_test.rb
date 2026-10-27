@@ -211,7 +211,7 @@ class PostStatusTest < ActionDispatch::IntegrationTest
   test "le azioni chiedono conferma con la finestra dell'app: titolo, bottone e tono" do
     get post_path(posts(:festa_di_natale))
     assert_select "form[action='#{publish_post_path(posts(:festa_di_natale))}'][data-confirm-title='Pubblicare adesso?'][data-confirm-button='Pubblica Ora']:not([data-confirm-tone])"
-    assert_select "form[action='#{post_path(posts(:festa_di_natale))}'][data-confirm-tone=pericolo][data-confirm-button=Elimina][data-turbo-confirm*='L'azione è irreversibile']"
+    assert_select "form[action='#{post_path(posts(:festa_di_natale))}'][data-confirm-tone=pericolo][data-confirm-button=Elimina][data-turbo-confirm*=\"L'azione è irreversibile\"]"
 
     get post_path(posts(:open_day))
     assert_select "form[action='#{unpublish_post_path(posts(:open_day))}'][data-confirm-tone=pericolo][data-confirm-button=Spubblica]"
@@ -263,5 +263,21 @@ class PostStatusTest < ActionDispatch::IntegrationTest
     get post_path(posts(:open_day))
     assert_select "form[action$='/unpublish'][data-turbo-confirm*='sparisce dalla pagina Facebook.']"
     assert_select "form[action='#{post_path(posts(:open_day))}'][data-turbo-confirm*='sparirà anche dalla pagina Facebook']"
+  end
+
+  test "le azioni che parlano con i social mostrano il velo di attesa, con un messaggio adatto" do
+    get post_path(posts(:mensa))
+    assert_select "form[action$='/publish'][data-busy-message='Pubblicazione sulla pagina Facebook in corso…']"
+    assert_select "form[action$='/schedule'][data-busy-message='Programmazione sulla pagina Facebook in corso…']"
+    assert_select "form[action='#{post_path(posts(:mensa))}']:not([data-busy-message])", 1, "eliminare una bozza non tocca i social"
+
+    get post_path(posts(:open_day))
+    assert_select "form[action$='/unpublish'][data-busy-message='Rimozione del post dalla pagina Facebook in corso…']"
+    assert_select "form[action='#{post_path(posts(:open_day))}'][data-busy-message^='Eliminazione del post e rimozione dalla pagina Facebook']"
+
+    get edit_post_path(posts(:open_day))
+    assert_select "form.modulo[data-busy-message^='Salvataggio e aggiornamento sulla pagina Facebook']"
+    get edit_post_path(posts(:mensa))
+    assert_select "form.modulo:not([data-busy-message])"
   end
 end

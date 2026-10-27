@@ -2,3 +2,4 @@
 import "@hotwired/turbo-rails"
 import "controllers"
 import "confirm_dialog"
+import "busy_overlay"

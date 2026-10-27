@@ -1,4 +1,7 @@
-<%= form_with model: post, class: "modulo", data: { controller: "media-editor" } do |f| %>
+<%# Salvare un post già programmato o pubblicato aggiorna anche i social: intanto un velo con lo spinner. %>
+<%= form_with model: post, class: "modulo",
+              data: { controller: "media-editor",
+                      busy_message: (post.persisted? && !post.draft? ? "Salvataggio e aggiornamento #{social_pages_phrase(post)} in corso…" : nil) } do |f| %>
   <%= hidden_field_tag :assistant_token, @assistant_token, id: nil %>
   <% if post.errors.any? %>
     <div class="avviso avviso-ritardo" role="alert">

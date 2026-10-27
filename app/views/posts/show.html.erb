@@ -60,7 +60,8 @@
       <% end %>
     </ul>
     <% if !@post.draft? && @post.publications.any? { |p| p.sync_error.present? } %>
-      <%= button_to "Riprova la sincronizzazione", resync_post_path(@post), method: :patch, class: "bottone bottone-secondario" %>
+      <%= button_to "Riprova la sincronizzazione", resync_post_path(@post), method: :patch, class: "bottone bottone-secondario",
+                    form: { data: { busy_message: "Sincronizzazione con i social in corso…" } } %>
     <% end %>
   </section>
 <% end %>
