@@ -1,0 +1,17 @@
+<% content_for :title, "Modifica: #{@post.title_was || @post.title} · TinyTales" %>
+<% content_for :wide, true %>
+
+<div class="con-assistente">
+  <div class="con-assistente-principale">
+    <nav class="briciole">
+      <%= link_to "Tutti i post", posts_path %> ›
+      <%= link_to @post.title_was || @post.title, post_path(@post) %> › Modifica
+    </nav>
+
+    <h1 class="pagina-titolo">Modifica il post</h1>
+
+    <%= render "form", post: @post %>
+  </div>
+
+  <%= render "assistant", post: @post %>
+</div>

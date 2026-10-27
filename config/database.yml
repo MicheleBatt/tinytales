@@ -1,0 +1,17 @@
+# PostgreSQL locale, con l'utente del sistema tramite socket Unix.
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+
+development:
+  <<: *default
+  database: tinytales_development
+
+test:
+  <<: *default
+  database: tinytales_test
+
+production:
+  <<: *default
+  database: tinytales_production

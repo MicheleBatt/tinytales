@@ -1,0 +1,145 @@
+<% content_for :title, "#{@post.title} · TinyTales" %>
+
+<nav class="briciole">
+  <%= link_to "Tutti i post", posts_path %> ›
+  <%= link_to status_label(@post.status), posts_path(q: { status_eq: @post.status }) %>
+</nav>
+
+<header class="dettaglio-testa">
+  <div class="scheda-meta">
+    <span class="scheda-data"><%= publish_time(@post) %></span>
+    <% if @post.publish_at %><span class="scheda-quando"><%= days_label(@post.publish_at) %></span><% end %>
+  </div>
+  <h1><%= @post.title %></h1>
+  <div class="scheda-stato">
+    <%= status_pill(@post) %>
+    <% if @post.social_pages.any? %>
+      <span class="nota-stato">su</span>
+      <% @post.social_pages.each do |page| %>
+        <%= link_to page.url, target: "_blank", rel: "noopener", class: "chip-link" do %><%= social_page_chip(page) %><% end %>
+      <% end %>
+    <% else %>
+      <span class="nota-stato">nessuna pagina social collegata</span>
+    <% end %>
+  </div>
+
+  <div class="azioni-post">
+    <% pages = @post.social_pages.map(&:name).to_sentence.presence || "nessuna pagina" %>
+    <% if @post.publishable? %>
+      <%= button_to "Pubblica", publish_post_path(@post), method: :patch, class: "bottone bottone-principale",
+                    form: { data: { turbo_confirm: "Pubblicare adesso il post su #{pages}?", turbo_submits_with: "Pubblicazione in corso…" } } %>
+      <span class="aiuto">L'ora di pubblicazione è arrivata: il post esce subito su <%= pages %>.</span>
+    <% elsif @post.schedulable? %>
+      <%= button_to "Programma", schedule_post_path(@post), method: :patch, class: "bottone bottone-principale",
+                    form: { data: { turbo_submits_with: "Programmazione in corso…" } } %>
+      <span class="aiuto">Uscirà su <%= pages %> <%= publish_time(@post) %>.</span>
+    <% elsif @post.draft? %>
+      <span class="aiuto">Per pubblicarlo o programmarlo, imposta prima data e ora con «Modifica».</span>
+    <% elsif @post.published? %>
+      <%= button_to "Spubblica", unpublish_post_path(@post), method: :patch, class: "bottone bottone-secondario",
+                    form: { data: { turbo_confirm: "Togliere il post da #{pages}? Nell'app resterà come bozza." } } %>
+      <span class="aiuto">Il post sparisce dai social e torna bozza.</span>
+    <% end %>
+
+    <span class="azioni-separatore" aria-hidden="true"></span>
+    <%= link_to "Modifica", edit_post_path(@post), class: "bottone bottone-secondario" %>
+    <% confirm = @post.draft? ? "Eliminare definitivamente il post «#{@post.title}», con le sue immagini e i suoi video?" :
+                                "Eliminare definitivamente il post «#{@post.title}»? Sparirà anche da #{pages}." %>
+    <%= button_to "Elimina", post_path(@post), method: :delete, class: "bottone bottone-pericolo",
+                  form: { data: { turbo_confirm: confirm } } %>
+  </div>
+</header>
+
+<% unconnected = @post.publications.map(&:social_page).reject(&:connected?) %>
+<% if unconnected.any? %>
+  <p class="avviso avviso-info">
+    <%= unconnected.map(&:name).to_sentence %>: pagina non ancora collegata all'app, quindi da qui non si può pubblicare.
+    Si collega una volta sola con <code>bin/rails social:facebook:connect</code> (istruzioni nel README).
+  </p>
+<% end %>
+
+<% if @post.publications.any? %>
+  <section class="riquadro sui-social">
+    <h2>Sui social</h2>
+    <ul class="elenco-social">
+      <% @post.publications.each do |publication| %>
+        <li>
+          <%= social_page_chip(publication.social_page) %>
+          <span class="sui-social-nome"><%= publication.social_page.name %></span>
+          <% if publication.on_social? %>
+            <span class="sui-social-stato">
+              <%= @post.scheduled? ? "programmato" : "online" %>
+              <% if publication.synced_at %>· aggiornato <%= l(publication.synced_at, format: :short) %><% end %>
+            </span>
+            <%= link_to "Apri su #{publication.social_page.platform_label} ↗", publication.remote_url, target: "_blank", rel: "noopener" %>
+          <% elsif @post.draft? %>
+            <span class="sui-social-stato">non ancora pubblicato</span>
+          <% else %>
+            <span class="sui-social-stato">non collegato a un post sul social (forse pubblicato a mano)</span>
+          <% end %>
+          <% if publication.sync_error.present? %>
+            <span class="errore-campo">Ultimo errore: <%= publication.sync_error %></span>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+    <% if !@post.draft? && @post.publications.any? { |p| p.sync_error.present? } %>
+      <%= button_to "Riprova la sincronizzazione", resync_post_path(@post), method: :patch, class: "bottone bottone-secondario" %>
+    <% end %>
+  </section>
+<% end %>
+
+<div class="dettaglio">
+  <section class="riquadro riquadro-testo" data-controller="clipboard">
+    <div class="riquadro-testa">
+      <h2>Testo del post</h2>
+      <% if @post.body.present? %>
+        <button type="button" class="bottone" data-action="clipboard#copy" data-clipboard-target="button">Copia testo</button>
+      <% end %>
+    </div>
+    <% if @post.body.present? %>
+      <div class="testo-post" data-clipboard-target="source"><%= @post.body %></div>
+    <% else %>
+      <p class="vuoto">Il testo non è ancora stato scritto.</p>
+    <% end %>
+  </section>
+
+  <aside class="colonna">
+    <section class="riquadro <%= 'riquadro-manca' if @post.draft? && @post.notes.present? %>">
+      <h2>Note</h2>
+      <% if @post.notes.present? %>
+        <div class="note"><%= simple_format(@post.notes) %></div>
+      <% else %>
+        <p class="vuoto">Nessuna nota.</p>
+      <% end %>
+    </section>
+  </aside>
+</div>
+
+<section class="riquadro">
+  <h2>Immagini e video, nell'ordine di caricamento</h2>
+  <% if @post.media.any? %>
+    <div class="galleria">
+      <% @post.ordered_media.each do |file| %>
+        <figure class="<%= 'provvisoria' if placeholder?(file) %>">
+          <% if file.image? %>
+            <%= link_to rails_blob_path(file, disposition: "inline"), target: "_blank", rel: "noopener",
+                        title: "Clic per vederla a tutto schermo", data: lightbox_data(file) do %>
+              <%= image_tag file.variant(:thumb), alt: file.filename.to_s, loading: "lazy" %>
+            <% end %>
+          <% else %>
+            <%= video_tag rails_blob_path(file, disposition: "inline"), controls: true, preload: "metadata" %>
+            <button type="button" class="lightbox-apri" title="Guarda a tutto schermo" aria-label="Guarda <%= file.filename %> a tutto schermo"
+                    <%= tag.attributes(data: lightbox_data(file)) %>>⤢</button>
+          <% end %>
+          <figcaption>
+            <%= file.filename %>
+            <% if placeholder?(file) %><span class="pill pill-draft">provvisoria</span><% end %>
+          </figcaption>
+        </figure>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="vuoto">Nessuna immagine o video allegato.</p>
+  <% end %>
+</section>

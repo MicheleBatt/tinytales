@@ -1,0 +1,120 @@
+<%= form_with model: post, class: "modulo", data: { controller: "media-editor" } do |f| %>
+  <%= hidden_field_tag :assistant_token, @assistant_token, id: nil %>
+  <% if post.errors.any? %>
+    <div class="avviso avviso-ritardo" role="alert">
+      <strong>Il post non è stato salvato.</strong> Correggi questi punti:
+      <ul><% post.errors.full_messages.each do |message| %><li><%= message %></li><% end %></ul>
+    </div>
+  <% end %>
+  <% if @media_discarded %>
+    <p class="avviso avviso-info">I nuovi file scelti non sono stati caricati: selezionali di nuovo prima di salvare.</p>
+  <% end %>
+
+  <header class="dettaglio-testa">
+    <div class="campo">
+      <%= f.label :title, "Titolo" %>
+      <%= f.text_field :title, class: "campo-titolo", placeholder: "es. Vi presentiamo Elmer", required: true,
+                       "aria-invalid": post.errors.include?(:title) %>
+      <%= field_error(post, :title) %>
+    </div>
+
+    <div class="riga-campi">
+      <div class="campo">
+        <%= f.label :publish_at, "Data e ora di pubblicazione" %>
+        <%= f.datetime_local_field :publish_at, required: true, "aria-invalid": post.errors.include?(:publish_at) %>
+        <%= field_error(post, :publish_at) %>
+      </div>
+
+      <div class="campo">
+        <span class="etichetta">Stato</span>
+        <div class="stato-fisso">
+          <%= tag.span(status_label(post.status), class: "pill pill-#{post.status}") %>
+        </div>
+      </div>
+
+      <fieldset class="campo" <%= "disabled" unless post.draft? %>>
+        <legend>Pagine social</legend>
+        <div class="scelte">
+          <%= f.collection_check_boxes :social_page_ids, @social_pages, :id, :name do |b| %>
+            <label class="scelta" title="<%= b.object.name %>">
+              <%= b.check_box %>
+              <span><%= b.object.platform_label %></span>
+            </label>
+          <% end %>
+        </div>
+        <% unless post.draft? %>
+          <span class="aiuto">Il post è già sui social: per cambiare le pagine, spubblicalo prima.</span>
+        <% end %>
+      </fieldset>
+    </div>
+  </header>
+
+  <div class="dettaglio">
+    <section class="riquadro riquadro-testo">
+      <div class="riquadro-testa">
+        <%= f.label :body, "Testo del post", class: "riquadro-titolo" %>
+      </div>
+      <%= f.text_area :body, rows: 20, class: "testo-post testo-modificabile",
+                      placeholder: "Il testo da pubblicare, con emoji, link e hashtag." %>
+    </section>
+
+    <aside class="colonna">
+      <section class="riquadro">
+        <%= f.label :notes, "Note", class: "riquadro-titolo" %>
+        <p class="aiuto">Solo per te: cosa manca, promemoria, da chi arrivano le foto. Non vengono pubblicate.</p>
+        <%= f.text_area :notes, rows: 12, class: "testo-modificabile" %>
+      </section>
+    </aside>
+  </div>
+
+  <section class="riquadro">
+    <h2>Immagini e video, nell'ordine di caricamento</h2>
+    <% if post.media.any?(&:persisted?) %>
+      <p class="aiuto">Trascina le miniature per cambiare l'ordine, oppure usa le frecce ← →.</p>
+    <% end %>
+    <%= field_error(post, :media) %>
+
+    <div class="galleria galleria-ordinabile" data-media-editor-target="list"
+         data-action="dragover->media-editor#dragOver drop->media-editor#drop">
+      <% post.ordered_media.select(&:persisted?).each do |file| %>
+        <figure class="<%= 'provvisoria' if placeholder?(file) %>" draggable="true" data-media-editor-target="item"
+                data-action="dragstart->media-editor#dragStart dragend->media-editor#dragEnd">
+          <span class="posizione" data-media-editor-target="position"></span>
+          <% lightbox = lightbox_data(file) %>
+          <% if file.image? %>
+            <%= image_tag file.variant(:thumb), alt: file.filename.to_s, loading: "lazy", draggable: false,
+                          class: "apribile", title: "Clic per vederla a tutto schermo", data: lightbox %>
+          <% else %>
+            <%= video_tag rails_blob_path(file, disposition: "inline"), controls: true, preload: "metadata" %>
+            <button type="button" class="lightbox-apri" title="Guarda a tutto schermo" aria-label="Guarda <%= file.filename %> a tutto schermo"
+                    <%= tag.attributes(data: lightbox) %>>⤢</button>
+          <% end %>
+          <%= hidden_field_tag "post[media][]", file.signed_id, id: nil, data: { media_editor_target: "keep" } %>
+          <figcaption>
+            <span><%= file.filename %></span>
+            <span class="comandi">
+              <button type="button" class="bottone-freccia" data-action="media-editor#moveEarlier"
+                      aria-label="Sposta <%= file.filename %> prima">←</button>
+              <button type="button" class="bottone-freccia" data-action="media-editor#moveLater"
+                      aria-label="Sposta <%= file.filename %> dopo">→</button>
+              <button type="button" class="bottone-piccolo" data-action="media-editor#toggle">Rimuovi</button>
+            </span>
+          </figcaption>
+        </figure>
+      <% end %>
+    </div>
+
+    <div class="caricamento">
+      <%= f.label :media, "Aggiungi immagini o video" %>
+      <%= f.file_field :media, multiple: true, accept: "image/*,video/*",
+                       data: { action: "media-editor#preview", media_editor_target: "input" } %>
+      <span class="aiuto">I nuovi file si aggiungono dopo quelli già presenti.</span>
+    </div>
+    <div class="galleria galleria-nuovi" data-media-editor-target="previews"></div>
+  </section>
+
+  <div class="barra-azioni">
+    <%= f.submit class: "bottone" %>
+    <%= link_to "Annulla", post.persisted? ? post_path(post) : posts_path, class: "bottone bottone-secondario" %>
+  </div>
+<% end %>

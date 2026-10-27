@@ -1,0 +1,57 @@
+<aside class="assistente" data-controller="assistant"
+       data-assistant-url-value="<%= assistant_messages_path %>"
+       data-assistant-token-value="<%= @assistant_token %>"
+       data-assistant-post-id-value="<%= post.id %>"
+       data-assistant-file-url-value="<%= assistant_file_path(token: @assistant_token, name: "__NOME__") %>">
+  <button type="button" class="assistente-apri" data-assistant-target="opener" data-action="assistant#open" hidden>
+    ✦ Claude
+  </button>
+
+  <section class="assistente-pannello" data-assistant-target="panel" aria-label="Claude"
+           data-action="dragover->assistant#dragOver dragleave->assistant#dragLeave drop->assistant#drop">
+    <header class="assistente-testa">
+      <div>
+        <h2>Claude</h2>
+        <span class="assistente-sotto">Claude Code · conosce sito, post e convenzioni</span>
+      </div>
+      <button type="button" class="assistente-chiudi" data-action="assistant#close" aria-label="Chiudi la chat con Claude">×</button>
+    </header>
+
+    <div class="assistente-messaggi" data-assistant-target="messages" aria-live="polite">
+      <div class="assistente-intro" data-assistant-target="intro" <%= "hidden" if @assistant_messages.any? %>>
+        <p>Chiedimi di scrivere o rivedere il testo, proporre un titolo, preparare una grafica.
+           Puoi anche allegarmi una bozza, un PDF, foto o video con <strong>«📎 Allega»</strong> o trascinandoli qui.
+           Le mie proposte compaiono qui con il pulsante <strong>«Applica al form»</strong>: niente cambia finché non le applichi e salvi.</p>
+        <div class="assistente-spunti">
+          <% assistant_hints(post).each do |hint| %>
+            <button type="button" class="spunto" data-action="assistant#suggest"><%= hint %></button>
+          <% end %>
+        </div>
+      </div>
+
+      <% @assistant_messages.each do |message| %>
+        <div class="msg msg-<%= message.role %>" data-assistant-target="stored" data-raw="<%= message.content %>"
+             data-attachments="<%= message.attachments.to_json %>">
+          <div class="msg-corpo"><%= simple_format(message.content) %></div>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="assistente-scrivi">
+      <ul class="allegati-scelti" data-assistant-target="pending" aria-label="File da allegare" hidden></ul>
+      <label for="assistente-input" class="nascosto-visivo">Messaggio per Claude</label>
+      <textarea id="assistente-input" rows="3" data-assistant-target="input" data-action="keydown->assistant#keydown"
+                placeholder="Scrivi a Claude… (Invio per mandare, Maiusc+Invio per andare a capo)"></textarea>
+      <div class="assistente-azioni">
+        <input type="file" multiple class="nascosto-visivo" tabindex="-1" aria-hidden="true"
+               accept="<%= AssistantConversation.accepted_extensions.join(',') %>,text/plain,image/*,video/*,application/pdf"
+               data-assistant-target="fileInput" data-action="change->assistant#filesChosen">
+        <button type="button" class="bottone bottone-secondario bottone-allega" data-assistant-target="attach"
+                data-action="assistant#chooseFiles" title="Allega testi, PDF, immagini o video (anche trascinandoli qui)">📎 Allega</button>
+        <span class="assistente-stato" data-assistant-target="status"></span>
+        <button type="button" class="bottone bottone-secondario" data-assistant-target="stop" data-action="assistant#stop" hidden>Interrompi</button>
+        <button type="button" class="bottone" data-assistant-target="send" data-action="assistant#send">Invia</button>
+      </div>
+    </div>
+  </section>
+</aside>

@@ -1,0 +1,74 @@
+<%# La finestra di «Proponi post con Claude». Tre momenti: spiegazione e conferma, lavoro in corso
+    (stato e anteprime delle proposte), approvazione o annullamento. Gestita dal controller post-suggestions. %>
+<dialog class="proposte" data-post-suggestions-target="dialog" aria-labelledby="proposte-titolo"
+        data-action="cancel->post-suggestions#close">
+  <header class="proposte-testa">
+    <h2 id="proposte-titolo"><span aria-hidden="true">✦</span> Proponi post con Claude</h2>
+    <button type="button" class="proposte-chiudi" data-post-suggestions-target="close"
+            data-action="post-suggestions#close" aria-label="Chiudi">×</button>
+  </header>
+
+  <div class="proposte-corpo">
+    <section data-post-suggestions-target="intro" class="proposte-intro">
+      <p>Claude esamina i post già previsti <strong>da oggi a <%= l(Date.current + PostSuggestionBatch::HORIZON, format: :long) %></strong>
+        e, se lo ritiene opportuno, propone nuovi post:</p>
+      <ul>
+        <li>per coprire i periodi in cui non è prevista nessuna pubblicazione;</li>
+        <li>su argomenti mai trattati, o già trattati ma da rinforzare.</li>
+      </ul>
+      <p>Conosce il sito, i post dell'app, la memoria del progetto e il lavoro previsto. Può preparare grafiche
+        nuove o usare le foto del sito. Se gli manca qualcosa (un dato, una foto) lascia il campo vuoto e lo
+        scrive nelle note.</p>
+      <p>Le proposte compaiono qui una alla volta: puoi togliere subito quelle che non vanno. <strong>Nel database
+        non viene salvato niente</strong> finché non approvi: allora diventano bozze, da rivedere, programmare
+        e pubblicare quando vuoi.</p>
+      <p class="proposte-avviso">Ci vogliono diversi minuti. Tieni aperta questa pagina finché Claude non ha finito.</p>
+    </section>
+
+    <section data-post-suggestions-target="work" class="proposte-lavoro" hidden>
+      <div class="proposte-stato" data-post-suggestions-target="status" aria-live="polite">
+        <span class="proposte-indicatore" data-post-suggestions-target="spinner" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="proposte-attivita" data-post-suggestions-target="activity">Avvio di Claude…</span>
+        <span class="proposte-tempo" data-post-suggestions-target="elapsed"></span>
+      </div>
+      <p class="proposte-pensiero" data-post-suggestions-target="thought" hidden></p>
+      <ol class="proposte-elenco" data-post-suggestions-target="list" aria-label="Proposte di Claude"></ol>
+      <p class="proposte-vuoto" data-post-suggestions-target="empty">Ancora nessuna proposta: Claude sta studiando la situazione.</p>
+      <ul class="proposte-scarti" data-post-suggestions-target="rejected"></ul>
+    </section>
+  </div>
+
+  <footer class="proposte-piede">
+    <p class="proposte-riepilogo" data-post-suggestions-target="summary"></p>
+    <div class="proposte-bottoni" data-post-suggestions-target="introButtons">
+      <button type="button" class="bottone" data-action="post-suggestions#close">Annulla</button>
+      <button type="button" class="bottone bottone-principale" data-action="post-suggestions#start" autofocus>Avvia Claude</button>
+    </div>
+    <div class="proposte-bottoni" data-post-suggestions-target="runningButtons" hidden>
+      <button type="button" class="bottone" data-action="post-suggestions#stop">Interrompi</button>
+    </div>
+    <div class="proposte-bottoni" data-post-suggestions-target="finalButtons" hidden>
+      <button type="button" class="bottone bottone-pericolo" data-action="post-suggestions#discard">Annulla tutto</button>
+      <button type="button" class="bottone bottone-principale" data-post-suggestions-target="approve"
+              data-action="post-suggestions#approve">Crea le bozze</button>
+    </div>
+  </footer>
+
+  <template data-post-suggestions-target="card">
+    <li class="proposta-post">
+      <div class="proposta-post-foto"></div>
+      <div class="proposta-post-testo">
+        <p class="proposta-post-data"></p>
+        <h3 class="proposta-post-titolo"></h3>
+        <p class="proposta-post-estratto"></p>
+        <p class="proposta-post-note"></p>
+        <p class="proposta-post-motivo"></p>
+        <details class="proposta-post-dettagli">
+          <summary>Testo completo</summary>
+          <div class="proposta-post-corpo"></div>
+        </details>
+      </div>
+      <button type="button" class="proposta-post-togli" title="Togli questa proposta" aria-label="Togli questa proposta">×</button>
+    </li>
+  </template>
+</dialog>

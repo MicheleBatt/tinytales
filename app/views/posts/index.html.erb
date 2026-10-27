@@ -1,0 +1,116 @@
+<% content_for :title, "TinyTales · Scuola Santa Maria Goretti" %>
+
+<% if (unconnected = @social_pages.reject(&:connected?)).any? %>
+  <p class="avviso avviso-info">
+    <%= unconnected.map { |p| "#{p.platform_label} (#{p.name})" }.to_sentence %>: non ancora collegata all'app, quindi
+    «Pubblica» e «Programma» non funzionano. Si collega con <code>bin/rails social:facebook:connect</code> (istruzioni nel README).
+  </p>
+<% end %>
+
+<div data-controller="post-suggestions" data-post-suggestions-url-value="<%= post_suggestions_path %>">
+<div class="titolo-con-azione pagina-testa">
+  <div>
+    <h1 class="pagina-titolo">Post</h1>
+    <p class="pagina-sotto">I post delle pagine social della scuola</p>
+  </div>
+  <div class="azioni-testa">
+    <button type="button" class="bottone bottone-claude" data-action="post-suggestions#open"
+            data-post-suggestions-target="opener" aria-haspopup="dialog"
+            title="Claude esamina i prossimi tre mesi e propone dei post">
+      <span class="stellina" aria-hidden="true">✦</span> <span class="etichetta">Proponi post con Claude</span>
+    </button>
+    <%= link_to "Nuovo post", new_post_path, class: "bottone bottone-principale" %>
+  </div>
+</div>
+<%= render "proposte" %>
+</div>
+
+<div class="barra-stati">
+  <nav class="schede-stato" aria-label="Filtra per stato">
+    <% current = params.dig(:q, :status_eq).presence %>
+    <%= link_to posts_path, class: [ "tab-stato", ("attiva" unless current) ], "aria-current": ("page" unless current) do %>
+      Tutti <span class="conteggio"><%= @counts.values.sum %></span>
+    <% end %>
+    <% [ [ "scheduled", "Programmati" ], [ "draft", "Bozze" ], [ "published", "Pubblicati" ] ].each do |status, label| %>
+      <%= link_to posts_path(q: { status_eq: status }), class: [ "tab-stato", "tab-stato-#{status}", ("attiva" if current == status) ],
+                  "aria-current": ("page" if current == status) do %>
+        <%= label %> <span class="conteggio"><%= @counts.fetch(status, 0) %></span>
+      <% end %>
+    <% end %>
+  </nav>
+  <p class="prossimo">
+    <% if @next_post %>
+      Prossimo in uscita: <%= link_to @next_post.title, @next_post %>
+      <span class="data-mono"><%= publish_time(@next_post, format: :short) %></span> · <%= days_label(@next_post.publish_at) %>
+    <% else %>
+      Nessun post programmato
+    <% end %>
+  </p>
+</div>
+
+<%= search_form_for @q, url: posts_path, html: { class: "filtri", data: { turbo_action: "advance" } } do |f| %>
+  <% if @view == "calendario" %><%= hidden_field_tag :mese, @month.strftime("%Y-%m"), id: nil %><% end %>
+  <div class="filtro filtro-largo">
+    <%= f.label :title_or_body_or_notes_cont, "Cerca" %>
+    <%= f.search_field :title_or_body_or_notes_cont, placeholder: "Titolo, testo o note…" %>
+  </div>
+  <div class="filtro">
+    <%= f.label :status_eq, "Stato" %>
+    <%= f.select :status_eq, status_options, include_blank: "Tutti" %>
+  </div>
+  <div class="filtro">
+    <%= f.label :social_pages_id_eq, "Pagina social" %>
+    <%= f.select :social_pages_id_eq, @social_pages.map { |p| [ "#{p.platform_label} · #{p.name}", p.id ] }, include_blank: "Tutte" %>
+  </div>
+  <div class="filtro">
+    <%= f.label :publish_at_gteq, "Dal" %>
+    <%= f.date_field :publish_at_gteq %>
+  </div>
+  <div class="filtro">
+    <%= f.label :publish_at_lteq, "Al" %>
+    <%= f.date_field :publish_at_lteq %>
+  </div>
+  <div class="filtro">
+    <%= f.label :s, "Ordine" %>
+    <%= f.select :s, [ [ "Più recenti prima", "publish_at desc" ], [ "Meno recenti prima", "publish_at asc" ] ],
+                 selected: params.dig(:q, :s) || "publish_at desc" %>
+  </div>
+  <label class="filtro-spunta">
+    <%= check_box_tag "q[notes_present]", "1", params.dig(:q, :notes_present) == "1", id: "q_notes_present" %>
+    Solo con note
+  </label>
+  <div class="filtri-azioni">
+    <%= f.submit "Filtra", class: "bottone", name: nil %>
+    <%= link_to "Azzera", posts_path, class: "bottone bottone-secondario" %>
+  </div>
+<% end %>
+
+<div data-controller="view-switch">
+  <div class="barra-elenco">
+    <p class="risultati">
+      <% if @view == "calendario" %>
+        <%= pluralize(@month_count, "post", plural: "post") %> in <%= l(@month, format: "%B %Y") %><% if params[:q].present? %> con questi filtri<% end %>
+      <% else %>
+        <%= pluralize(@posts.size, "post", plural: "post") %><% if params[:q].present? %> trovati con questi filtri<% end %>
+      <% end %>
+    </p>
+    <%= render "view_switch" %>
+  </div>
+
+  <% if @view == "calendario" %>
+    <%= render "calendario" %>
+  <% elsif @posts.any? %>
+    <div class="elenco-post <%= 'vista-griglia' if @view == 'griglia' %>" role="table" aria-label="Post" data-view-switch-target="list">
+      <div class="elenco-testa" role="row">
+        <span role="columnheader"></span>
+        <span role="columnheader">Post</span>
+        <span role="columnheader">Pubblicazione</span>
+        <span role="columnheader">Stato</span>
+        <span role="columnheader">Pagine</span>
+      </div>
+      <%= render partial: "post", collection: @posts %>
+    </div>
+  <% else %>
+    <p class="vuoto">Nessun post corrisponde ai filtri. <%= link_to "Mostra tutti i post", posts_path %></p>
+  <% end %>
+</div>

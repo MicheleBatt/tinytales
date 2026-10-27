@@ -1,0 +1,46 @@
+it:
+  activerecord:
+    models:
+      post: Post
+      social_page: Pagina social
+    attributes:
+      post:
+        title: Titolo
+        body: Testo
+        publish_at: Data e ora di pubblicazione
+        status: Stato
+        notes: Note
+        media: Immagini e video
+        social_pages: Pagine social
+  errors:
+    format: "%{attribute}: %{message}"
+    messages:
+      blank: campo obbligatorio
+      inclusion: valore non valido
+      invalid: valore non valido
+      taken: già in uso
+  helpers:
+    submit:
+      post:
+        create: Crea il post
+        update: Salva le modifiche
+  date:
+    abbr_day_names: [dom, lun, mar, mer, gio, ven, sab]
+    day_names: [domenica, lunedì, martedì, mercoledì, giovedì, venerdì, sabato]
+    abbr_month_names: [~, gen, feb, mar, apr, mag, giu, lug, ago, set, ott, nov, dic]
+    month_names: [~, gennaio, febbraio, marzo, aprile, maggio, giugno, luglio, agosto, settembre, ottobre, novembre, dicembre]
+    order:
+      - :day
+      - :month
+      - :year
+    formats:
+      default: "%d/%m/%Y"
+      long: "%A %-d %B %Y"
+      short: "%a %-d %b"
+  time:
+    am: ""
+    pm: ""
+    formats:
+      default: "%d/%m/%Y %H.%M"
+      long: "%A %-d %B %Y, ore %H.%M"
+      short: "%a %-d %b, %H.%M"

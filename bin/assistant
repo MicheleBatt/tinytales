@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+# Comandi di sola lettura per l'assistente della chat, avviabili da qualsiasi cartella:
+#   bin/assistant posts       elenco dei post
+#   bin/assistant post 12     un post completo, con i percorsi dei file
+command, id = ARGV
+abort "Uso: bin/assistant posts | bin/assistant post ID" unless %w[posts post].include?(command)
+
+Dir.chdir(File.expand_path("..", __dir__))
+ENV.delete("DATABASE")
+args = [ "bin/rails", "assistant:#{command}" ]
+args << "ID=#{id}" if command == "post"
+exec(*args)

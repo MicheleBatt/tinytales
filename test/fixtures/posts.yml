@@ -1,0 +1,23 @@
+open_day:
+  title: Open Day di novembre
+  body: Vieni a conoscerci sabato 21 novembre!
+  status: published
+  publish_at: 2026-10-26 10:51:00 +0100
+
+promemoria:
+  title: Promemoria Open Day
+  body: Mancano pochi giorni all'Open Day!
+  status: scheduled
+  publish_at: 2026-11-18 20:30:00 +0100
+
+mensa:
+  title: La nostra mensa
+  body: Cosa si mangia alla nostra scuola?
+  status: draft
+  publish_at: 2026-11-12 20:30:00 +0100
+
+festa_di_natale:
+  title: Festa di Natale
+  body: Sta arrivando la festa di Natale!
+  status: draft
+  notes: Manca la data della festa.

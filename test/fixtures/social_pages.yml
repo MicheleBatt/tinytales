@@ -1,0 +1,11 @@
+facebook:
+  name: Scuola dell'Infanzia Santa Maria Goretti Creola
+  platform: facebook
+  url: https://www.facebook.com/infanziacreola/
+  external_id: "1234"
+  access_token: token-di-prova
+
+instagram:
+  name: scuola_infanzia_smgoretti
+  platform: instagram
+  url: https://www.instagram.com/scuola_infanzia_smgoretti

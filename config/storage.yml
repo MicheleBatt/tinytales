@@ -1,0 +1,8 @@
+# Immagini e video dei post, salvati sul disco di questa macchina.
+local:
+  service: Disk
+  root: <%= Rails.root.join("storage") %>
+
+test:
+  service: Disk
+  root: <%= Rails.root.join("tmp/storage") %>

@@ -1,0 +1,16 @@
+<% content_for :title, "Nuovo post · TinyTales" %>
+<% content_for :wide, true %>
+
+<div class="con-assistente">
+  <div class="con-assistente-principale">
+    <nav class="briciole">
+      <%= link_to "Tutti i post", posts_path %> › Nuovo post
+    </nav>
+
+    <h1 class="pagina-titolo">Nuovo post</h1>
+
+    <%= render "form", post: @post %>
+  </div>
+
+  <%= render "assistant", post: @post %>
+</div>

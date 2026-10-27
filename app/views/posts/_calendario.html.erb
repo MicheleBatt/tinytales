@@ -1,0 +1,63 @@
+<%# Vista a calendario: un mese alla volta, a settimane da lunedì a domenica.
+    Ogni giorno è un riquadro con i suoi post, colorati per stato. %>
+<section class="calendario" aria-label="Calendario dei post di <%= l(@month, format: "%B %Y") %>">
+  <div class="calendario-barra">
+    <div class="calendario-nav">
+      <%= link_to "‹", calendar_month_path(@month.prev_month), class: "bottone bottone-icona", title: "Mese precedente",
+                  "aria-label": "Mese precedente" %>
+      <%= link_to "Oggi", calendar_month_path(Date.current), class: "bottone" %>
+      <%= link_to "›", calendar_month_path(@month.next_month), class: "bottone bottone-icona", title: "Mese successivo",
+                  "aria-label": "Mese successivo" %>
+      <h2 class="calendario-mese"><%= l(@month, format: "%B %Y").upcase_first %></h2>
+    </div>
+
+    <%= form_with url: posts_path, method: :get, class: "calendario-salta", data: { controller: "autosubmit", turbo_action: "advance" } do %>
+      <% (request.query_parameters["q"] || {}).each do |key, value| %>
+        <%= hidden_field_tag "q[#{key}]", value, id: nil %>
+      <% end %>
+      <%= hidden_field_tag :vista, "calendario", id: nil %>
+      <label for="calendario-mese-scelto">Vai al mese</label>
+      <%= month_field_tag :mese, @month.strftime("%Y-%m"), id: "calendario-mese-scelto", data: { action: "change->autosubmit#submit" } %>
+      <noscript><%= submit_tag "Vai", class: "bottone", name: nil %></noscript>
+    <% end %>
+
+    <ul class="calendario-legenda" aria-label="Legenda">
+      <li class="evento-scheduled">Programmato</li>
+      <li class="evento-draft">Bozza</li>
+      <li class="evento-published">Pubblicato</li>
+    </ul>
+  </div>
+
+  <div class="calendario-griglia" role="grid">
+    <% PostsHelper::WEEKDAYS.each do |day| %>
+      <div class="calendario-intestazione" role="columnheader"><%= day %></div>
+    <% end %>
+
+    <% @calendar_days.each do |day| %>
+      <% posts = @calendar_posts.fetch(day, []) %>
+      <div role="gridcell" class="giorno <%= 'fuori-mese' unless day.month == @month.month %> <%= 'oggi' if day == Date.current %>
+                  <%= 'fine-settimana' if day.saturday? || day.sunday? %>"
+           aria-label="<%= l(day, format: :long) %>: <%= pluralize(posts.size, "post", plural: "post") %>">
+        <div class="giorno-numero"><%= day.day == 1 ? l(day, format: "%-d %b") : day.day %></div>
+        <% posts.each do |post| %>
+          <%= link_to post, class: "evento evento-#{post.overdue? && post.scheduled? ? 'late' : post.status}",
+                      title: "#{post.title} · #{status_label(post.status)} · #{l(post.publish_at, format: :short)}" do %>
+            <span class="evento-ora"><%= post.publish_at.strftime("%H.%M") %></span>
+            <span class="evento-titolo"><%= post.title %></span>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <% if @undated_posts.any? %>
+    <div class="calendario-senza-data">
+      <span class="calendario-senza-data-titolo">Senza data</span>
+      <% @undated_posts.each do |post| %>
+        <%= link_to post, class: "evento evento-#{post.status}", title: post.title do %>
+          <span class="evento-titolo"><%= post.title %></span>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+</section>

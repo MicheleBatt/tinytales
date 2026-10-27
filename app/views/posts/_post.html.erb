@@ -1,0 +1,38 @@
+<%= link_to post, class: "scheda riga #{'scheda-ritardo' if post.overdue? && post.scheduled?}", id: dom_id(post), role: "row" do %>
+  <span class="riga-miniatura" role="cell">
+    <% if (cover = post.cover) %>
+      <% if cover.image? %>
+        <%= image_tag cover.variant(:thumb), alt: "", loading: "lazy" %>
+      <% else %>
+        <span class="riga-video" aria-label="video">▶</span>
+      <% end %>
+      <% if post.media.size > 1 %><span class="riga-conta"><%= post.media.size %></span><% end %>
+    <% else %>
+      <span class="riga-vuota" aria-label="nessuna immagine">—</span>
+    <% end %>
+  </span>
+
+  <span class="riga-principale" role="cell">
+    <h3><%= post.title %></h3>
+    <span class="riga-estratto"><%= post.body.to_s.lines.first.to_s.strip.presence || "Testo da scrivere" %></span>
+    <span class="riga-segni">
+      <% if post.notes.present? %><span class="segno">note</span><% end %>
+      <% if post.media.any? { |file| placeholder?(file) } %><span class="segno segno-avviso">immagine provvisoria</span><% end %>
+    </span>
+  </span>
+
+  <span class="riga-data" role="cell">
+    <% if post.publish_at %>
+      <span class="data-mono"><%= publish_time(post, format: :short) %></span>
+      <span class="riga-quando"><%= days_label(post.publish_at) %></span>
+    <% else %>
+      <span class="riga-quando">Data da definire</span>
+    <% end %>
+  </span>
+
+  <span class="riga-stato" role="cell"><%= status_pill(post) %></span>
+
+  <span class="riga-pagine" role="cell">
+    <% post.social_pages.each do |page| %><%= social_page_chip(page) %><% end %>
+  </span>
+<% end %>

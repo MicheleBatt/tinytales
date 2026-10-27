@@ -1,0 +1,19 @@
+open_day_facebook:
+  post: open_day
+  social_page: facebook
+  remote_id: "1234_999"
+  remote_kind: feed
+
+promemoria_facebook:
+  post: promemoria
+  social_page: facebook
+  remote_id: "1234_888"
+  remote_kind: feed
+
+mensa_facebook:
+  post: mensa
+  social_page: facebook
+
+festa_di_natale_instagram:
+  post: festa_di_natale
+  social_page: instagram
