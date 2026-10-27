@@ -71,7 +71,8 @@ module PostsHelper
   # Gli attributi per aprire un file del post nell'anteprima a tutto schermo (controller lightbox).
   def lightbox_data(file, group: "post-media")
     { lightbox: rails_blob_path(file, disposition: "inline"), lightbox_group: group,
-      lightbox_caption: file.filename.to_s, lightbox_type: file.video? ? "video" : "image" }
+      lightbox_caption: file.filename.to_s, lightbox_type: file.video? ? "video" : "image",
+      lightbox_download: rails_blob_path(file, disposition: "attachment") }
   end
 
   # I file che iniziano con PROVVISORIA_ sono segnaposto da sostituire.

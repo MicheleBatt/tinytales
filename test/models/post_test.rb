@@ -1,19 +1,21 @@
 require "test_helper"
 
 class PostTest < ActiveSupport::TestCase
-  test "data e ora di pubblicazione sono sempre obbligatorie" do
+  test "la data può mancare nelle bozze, non nei post programmati o pubblicati" do
     post = Post.new(title: "Bozza")
-    assert_not post.valid?
-    assert post.errors.added?(:publish_at, :blank)
-
-    post.publish_at = 1.day.from_now
     assert post.valid?
     assert post.draft?
+
+    post.status = :published
+    assert_not post.valid?
+    assert post.errors.added?(:publish_at, :blank)
+    post.status = :scheduled
+    assert_not post.valid?
   end
 
-  test "una bozza con l'ora arrivata si pubblica, non si programma" do
+  test "una bozza senza data si pubblica subito, non si programma; la data diventa quella di uscita" do
     now = Time.zone.parse("2026-11-12 20:30")
-    post = posts(:mensa)
+    post = posts(:festa_di_natale)
 
     assert post.publishable?(now)
     assert_not post.schedulable?(now)
@@ -21,6 +23,22 @@ class PostTest < ActiveSupport::TestCase
 
     post.publish!(now)
     assert post.reload.published?
+    assert_equal now, post.publish_at
+  end
+
+  test "una bozza con la data passata, o arrivata, non si pubblica né si programma" do
+    post = posts(:mensa) # giovedì 12 novembre 2026, 20.30
+    [ Time.zone.parse("2026-11-12 20:30"), Time.zone.parse("2026-11-20 10:00") ].each do |now|
+      assert post.date_expired?(now)
+      assert_not post.publishable?(now)
+      assert_not post.schedulable?(now)
+      assert_raises(Post::TransitionError) { post.publish!(now) }
+      assert_raises(Post::TransitionError) { post.schedule!(now) }
+    end
+
+    post.update!(publish_at: nil)
+    assert post.publishable?
+    assert_not post.date_expired?
   end
 
   test "una bozza con l'ora nel futuro si programma, non si pubblica" do
@@ -48,11 +66,6 @@ class PostTest < ActiveSupport::TestCase
     assert_raises(Post::TransitionError) { posts(:open_day).publish!(now) }
   end
 
-  test "una bozza senza data non si pubblica né si programma" do
-    post = posts(:festa_di_natale)
-    assert_not post.publishable?
-    assert_not post.schedulable?
-  end
 
   test "il titolo è obbligatorio" do
     assert_not Post.new.valid?

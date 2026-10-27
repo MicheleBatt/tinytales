@@ -1,6 +1,6 @@
 <%# Vista a calendario: un mese alla volta, a settimane da lunedì a domenica.
     Ogni giorno è un riquadro con i suoi post, colorati per stato. %>
-<section class="calendario" aria-label="Calendario dei post di <%= l(@month, format: "%B %Y") %>">
+<section class="calendario" data-controller="post-preview" aria-label="Calendario dei post di <%= l(@month, format: "%B %Y") %>">
   <div class="calendario-barra">
     <div class="calendario-nav">
       <%= link_to "‹", calendar_month_path(@month.prev_month), class: "bottone bottone-icona", title: "Mese precedente",
@@ -41,7 +41,8 @@
         <div class="giorno-numero"><%= day.day == 1 ? l(day, format: "%-d %b") : day.day %></div>
         <% posts.each do |post| %>
           <%= link_to post, class: "evento evento-#{post.overdue? && post.scheduled? ? 'late' : post.status}",
-                      title: "#{post.title} · #{status_label(post.status)} · #{l(post.publish_at, format: :short)}" do %>
+                      title: "#{post.title} · #{status_label(post.status)} · #{l(post.publish_at, format: :short)}",
+                      data: { action: "post-preview#open", preview_url: preview_post_path(post) }, "aria-haspopup": "dialog" do %>
             <span class="evento-ora"><%= post.publish_at.strftime("%H.%M") %></span>
             <span class="evento-titolo"><%= post.title %></span>
           <% end %>
@@ -54,10 +55,18 @@
     <div class="calendario-senza-data">
       <span class="calendario-senza-data-titolo">Senza data</span>
       <% @undated_posts.each do |post| %>
-        <%= link_to post, class: "evento evento-#{post.status}", title: post.title do %>
+        <%= link_to post, class: "evento evento-#{post.status}", title: post.title,
+                    data: { action: "post-preview#open", preview_url: preview_post_path(post) }, "aria-haspopup": "dialog" do %>
           <span class="evento-titolo"><%= post.title %></span>
         <% end %>
       <% end %>
     </div>
   <% end %>
+
+  <dialog class="popup-anteprima" data-post-preview-target="dialog" data-action="click->post-preview#backdrop" aria-label="Anteprima del post">
+    <div class="popup-anteprima-interno">
+      <button type="button" class="proposte-chiudi popup-anteprima-chiudi" data-action="post-preview#close" aria-label="Chiudi l'anteprima">×</button>
+      <div data-post-preview-target="content" class="popup-anteprima-contenuto"></div>
+    </div>
+  </dialog>
 </section>

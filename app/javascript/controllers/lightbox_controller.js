@@ -5,8 +5,34 @@ import { Controller } from "@hotwired/stimulus"
 // data-lightbox-type="image|video", data-lightbox-group e data-lightbox-caption):
 // il clic viene intercettato qui, anche per gli elementi creati dopo (chat, anteprime dei nuovi file).
 // Si chiude con ×, Esc o clic fuori; con più file nello stesso gruppo, ← → scorrono.
+//
+// Ogni anteprima riceve anche un'iconcina ⤓ nell'angolo in alto a destra per scaricare il file
+// (indirizzo in data-lightbox-download, altrimenti quello dell'anteprima). Anche questa viene aggiunta
+// da sola agli elementi creati dopo; il clic sull'iconcina scarica e non apre l'anteprima.
 export default class extends Controller {
+  connect() {
+    this.decorate()
+    this.observer = new MutationObserver(() => {
+      clearTimeout(this.pending)
+      this.pending = setTimeout(() => this.decorate(), 0)
+    })
+    this.observer.observe(this.element, { childList: true, subtree: true })
+  }
+
+  disconnect() {
+    this.observer?.disconnect()
+    clearTimeout(this.pending)
+  }
+
   open(event) {
+    const download = event.target.closest(".scarica")
+    if (download && this.element.contains(download)) {
+      event.preventDefault()
+      event.stopPropagation()
+      this.download(download)
+      return
+    }
+
     const trigger = event.target.closest("[data-lightbox]")
     if (!trigger || !this.element.contains(trigger)) return
 
@@ -18,6 +44,57 @@ export default class extends Controller {
     this.trigger = trigger
     this.dialog().showModal()
     this.show()
+  }
+
+  // Aggiunge l'iconcina di download alle anteprime che non ce l'hanno ancora.
+  // - pulsante ⤢ dei video: l'iconcina va accanto, nell'angolo, e il ⤢ si sposta un po' a sinistra;
+  // - immagine o video «nudi»: vengono avvolti in un contenitore che fa da riferimento per l'angolo;
+  // - contenitori (link, riquadri): l'iconcina va dentro.
+  decorate() {
+    this.element.querySelectorAll("[data-lightbox]:not([data-scaricabile])").forEach((trigger) => {
+      if (trigger.hidden || trigger.closest(".lightbox")) return
+      trigger.dataset.scaricabile = ""
+      const button = this.downloadButton(trigger)
+
+      if (trigger.tagName === "BUTTON") {
+        trigger.classList.add("con-scarica")
+        trigger.before(button)
+      } else if (["IMG", "VIDEO"].includes(trigger.tagName)) {
+        const frame = document.createElement("span")
+        frame.className = "scaricabile"
+        trigger.before(frame)
+        frame.append(trigger, button)
+      } else {
+        trigger.classList.add("scaricabile")
+        trigger.append(button)
+      }
+    })
+  }
+
+  downloadButton(trigger) {
+    const name = trigger.dataset.lightboxCaption || ""
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "scarica"
+    button.title = name ? `Scarica ${name}` : "Scarica il file"
+    button.setAttribute("aria-label", button.title)
+    button.innerHTML = `<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 2v8m0 0L4.8 6.8M8 10l3.2-3.2M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    button.lightboxTrigger = trigger
+    return button
+  }
+
+  // Scarica con un link temporaneo: funziona anche per i file appena scelti, non ancora caricati (blob:).
+  download(button) {
+    const trigger = button.lightboxTrigger || button.parentElement.querySelector("[data-lightbox]")
+    if (!trigger) return
+
+    const link = document.createElement("a")
+    link.href = trigger.dataset.lightboxDownload || trigger.dataset.lightbox
+    link.download = trigger.dataset.lightboxCaption || ""
+    link.hidden = true
+    document.body.append(link)
+    link.click()
+    link.remove()
   }
 
   dialog() {

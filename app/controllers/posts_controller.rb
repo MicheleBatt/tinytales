@@ -2,8 +2,8 @@ class PostsController < ApplicationController
   SEARCH_FIELDS = %i[title_or_body_or_notes_cont status_eq social_pages_id_eq
                      publish_at_gteq publish_at_lteq notes_present s].freeze
 
-  before_action :promote_due_scheduled, only: %i[index show]
-  before_action :set_post, only: %i[show edit update destroy publish schedule unpublish resync]
+  before_action :promote_due_scheduled, only: %i[index show preview]
+  before_action :set_post, only: %i[show preview edit update destroy publish schedule unpublish resync]
   before_action :set_social_pages, only: %i[index new create edit update]
   before_action :set_assistant, only: %i[new create edit update]
 
@@ -19,6 +19,11 @@ class PostsController < ApplicationController
   end
 
   def show
+  end
+
+  # L'anteprima del post nel popup della vista a calendario (solo il contenuto, senza layout).
+  def preview
+    render partial: "anteprima", locals: { post: @post, return_to: back_path }
   end
 
   def new
@@ -59,9 +64,9 @@ class PostsController < ApplicationController
 
   def destroy
     warnings = PostSync.new(@post).destroy!
-    redirect_to posts_path, notice: "Post «#{@post.title}» eliminato, anche dai social.", flash: { warnings: }, status: :see_other
+    redirect_to back_path || posts_path, notice: "Post «#{@post.title}» eliminato, anche dai social.", flash: { warnings: }, status: :see_other
   rescue PostSync::Error => error
-    redirect_to @post, alert: "Il post non è stato eliminato. #{error.message}", status: :see_other
+    redirect_to back_path || @post, alert: "Il post non è stato eliminato. #{error.message}", status: :see_other
   end
 
   def publish
@@ -117,11 +122,17 @@ class PostsController < ApplicationController
 
   def sync(notice:)
     warnings = yield PostSync.new(@post)
-    redirect_to @post, notice:, flash: { warnings: }, status: :see_other
+    redirect_to back_path || @post, notice:, flash: { warnings: }, status: :see_other
   rescue PostSync::Error => error
-    redirect_to @post, alert: error.message, status: :see_other
+    redirect_to back_path || @post, alert: error.message, status: :see_other
   rescue ActiveRecord::RecordInvalid => error
-    redirect_to @post, alert: "Il post non è completo: #{error.record.errors.full_messages.to_sentence}.", status: :see_other
+    redirect_to back_path || @post, alert: "Il post non è completo: #{error.record.errors.full_messages.to_sentence}.", status: :see_other
+  end
+
+  # Dove tornare dopo un'azione lanciata dal popup del calendario: solo l'elenco dei post di questa app.
+  def back_path
+    path = params[:return_to].to_s
+    path if path.match?(%r{\A/(posts)?(\?[^\s]*)?\z})
   end
 
   def promote_due_scheduled

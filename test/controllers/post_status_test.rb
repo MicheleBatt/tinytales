@@ -12,17 +12,22 @@ class PostStatusTest < ActionDispatch::IntegrationTest
     assert_select "form[action='#{publish_post_path(posts(:mensa))}']", 0
   end
 
-  test "una bozza con l'ora passata o uguale a adesso mostra Pubblica" do
-    posts(:mensa).update_column(:publish_at, Time.current)
+  test "una bozza con la data passata non mostra né Pubblica né Programma, e spiega come fare" do
+    posts(:mensa).update_column(:publish_at, 1.hour.ago)
     get post_path(posts(:mensa))
-    assert_select "form[action='#{publish_post_path(posts(:mensa))}'] button", "Pubblica"
-    assert_select "form[action='#{schedule_post_path(posts(:mensa))}']", 0
+    assert_select "form[action$='/publish'], form[action$='/schedule']", 0
+    assert_select ".azioni-post .aiuto-attenzione", /è passata: con «Modifica» cancellala per pubblicarlo subito/
+
+    patch publish_post_path(posts(:mensa))
+    assert posts(:mensa).reload.draft?
+    assert_empty @facebook.calls
   end
 
-  test "una bozza senza data non mostra né Pubblica né Programma" do
+  test "una bozza senza data mostra Pubblica, non Programma" do
     get post_path(posts(:festa_di_natale))
-    assert_select "form[action$='/publish'], form[action$='/schedule']", 0
-    assert_select ".azioni-post .aiuto", /imposta prima data e ora/
+    assert_select "form[action='#{publish_post_path(posts(:festa_di_natale))}'] button", "Pubblica"
+    assert_select "form[action$='/schedule']", 0
+    assert_select ".azioni-post .aiuto", /Nessuna data impostata: il post esce subito/
   end
 
   test "Programma programma il post su Facebook e poi cambia lo stato" do
@@ -41,7 +46,7 @@ class PostStatusTest < ActionDispatch::IntegrationTest
   end
 
   test "Pubblica pubblica subito su Facebook" do
-    posts(:mensa).update_column(:publish_at, 1.hour.ago)
+    posts(:mensa).update_column(:publish_at, nil)
     patch publish_post_path(posts(:mensa))
 
     assert posts(:mensa).reload.published?
@@ -152,5 +157,36 @@ class PostStatusTest < ActionDispatch::IntegrationTest
       get posts_path
       assert posts(:promemoria).reload.published?
     end
+  end
+
+  test "il calendario apre i post in un popup, con anteprima, bottoni e link ai social" do
+    get posts_path, params: { vista: "calendario", mese: "2026-11" }
+    assert_select ".calendario[data-controller=post-preview] dialog.popup-anteprima"
+    assert_select ".giorno a.evento[data-action='post-preview#open'][data-preview-url='#{preview_post_path(posts(:mensa))}']"
+    assert_select ".calendario-senza-data a.evento[data-action='post-preview#open']"
+
+    back = "/posts?vista=calendario&mese=2026-11"
+    get preview_post_path(posts(:promemoria)), params: { return_to: back }
+    assert_response :success
+    assert_no_match(/<html|<nav/, response.body, "solo il contenuto, senza layout")
+    assert_select ".anteprima-post h2", "Promemoria Open Day"
+    assert_select ".pill-scheduled"
+    assert_select "a.chip-link[href^='https://www.facebook.com/1234_888'][target=_blank]", /Apri il post/
+    assert_select ".anteprima-testo", "Mancano pochi giorni all'Open Day!"
+    assert_select "form[action='#{post_path(posts(:promemoria))}'] input[name=return_to][value='#{back}']"
+    assert_select "a.anteprima-link[href='#{post_path(posts(:promemoria))}']"
+  end
+
+  test "un'azione lanciata dal popup torna al calendario; un indirizzo esterno viene ignorato" do
+    back = "/posts?vista=calendario&mese=2026-11"
+    patch schedule_post_path(posts(:mensa)), params: { return_to: back }
+    assert_redirected_to back
+    assert posts(:mensa).reload.scheduled?
+
+    patch unpublish_post_path(posts(:open_day)), params: { return_to: "//esempio.com/posts" }
+    assert_redirected_to post_path(posts(:open_day))
+
+    delete post_path(posts(:mensa)), params: { return_to: back }
+    assert_redirected_to back
   end
 end

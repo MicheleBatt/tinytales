@@ -50,18 +50,27 @@ class PostFormsTest < ActionDispatch::IntegrationTest
     assert_select ".avviso-info", /selezionali di nuovo/
   end
 
-  test "un post senza data e ora non si salva" do
-    assert_no_difference "Post.count" do
+  test "un post senza data e ora si salva come bozza da pubblicare subito" do
+    assert_difference "Post.count", 1 do
       post posts_path, params: { post: { title: "Promemoria", publish_at: "" } }
     end
-    assert_response :unprocessable_content
-    assert_select ".errore-campo", /obbligatorio/i
+    created = Post.order(:id).last
+    assert created.draft?
+    assert_nil created.publish_at
+    assert created.publishable?
   end
 
-  test "il form non permette di scegliere lo stato e richiede la data" do
+  test "a un post programmato non si può togliere la data" do
+    patch post_path(posts(:promemoria)), params: { post: { publish_at: "" } }
+    assert_response :unprocessable_content
+    assert_not_nil posts(:promemoria).reload.publish_at
+  end
+
+  test "il form non permette di scegliere lo stato e la data non è obbligatoria" do
     get new_post_path
     assert_select "input[name='post[status]']", 0
-    assert_select "input[name='post[publish_at]'][required]"
+    assert_select "input[name='post[publish_at]']:not([required])"
+    assert_select ".campo .aiuto", /Vuota: si pubblica subito/
     assert_select ".stato-fisso .pill-draft", "Bozza"
   end
 

@@ -28,7 +28,7 @@ In quel caso: `env -u DATABASE bin/rails …`.
 
 Database PostgreSQL `tinytales_development`, sul server locale con l'utente di sistema.
 
-- **posts**: titolo, testo (`body`), data e ora di pubblicazione (`publish_at`, obbligatoria),
+- **posts**: titolo, testo (`body`), data e ora di pubblicazione (`publish_at`, facoltativa nelle bozze),
   stato (`draft`, `scheduled`, `published`) e note interne (cosa manca, promemoria).
   Immagini e video sono allegati Active Storage (`media`), nell'ordine in cui vanno caricati.
 - **social_pages**: le pagine social gestite (nome, piattaforma, indirizzo, id sul social e token cifrato).
@@ -56,10 +56,12 @@ vanno scelti di nuovo.
 
 ## Stati di un post
 
-- Ogni post **nasce bozza** e ha sempre **data e ora di pubblicazione** (obbligatorie nel form).
-  Lo stato non si cambia dal form ma dai pulsanti della pagina del post:
-  - bozza con l'ora già arrivata → **Pubblica** → pubblicato;
-  - bozza con l'ora nel futuro → **Programma** → programmato;
+- Ogni post **nasce bozza**. Data e ora di pubblicazione si possono lasciare vuote finché è una bozza;
+  programmati e pubblicati ce l'hanno sempre. Lo stato non si cambia dal form ma dai pulsanti della pagina del post:
+  - bozza **senza data** → **Pubblica** → pubblicato subito (la data diventa quella di uscita);
+  - bozza con la data **nel futuro** → **Programma** → programmato;
+  - bozza con la data **passata** → nessuno dei due: si cancella la data (per pubblicarlo subito)
+    o se ne imposta una futura (per programmarlo);
   - post pubblicato → **Spubblica** → di nuovo bozza.
 - Il server ricontrolla l'ora al momento del clic (`Post#publish!`, `#schedule!`, `#unpublish!`).
 - Un post si può sempre **modificare** ed **eliminare** (con conferma), in qualunque stato.

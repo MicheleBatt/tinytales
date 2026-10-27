@@ -19,7 +19,7 @@ class PostSync
   end
 
   def publish!
-    ensure_transition!(post.publishable?(@now), "Si può pubblicare solo una bozza con l'ora di pubblicazione già arrivata.")
+    ensure_transition!(post.publishable?(@now), "Si può pubblicare subito solo una bozza senza data di pubblicazione: se la data è passata, cancellala o impostane una futura.")
     post.validate!
     create_everywhere(:publish)
     post.publish!(@now)

@@ -21,8 +21,9 @@
     <div class="riga-campi">
       <div class="campo">
         <%= f.label :publish_at, "Data e ora di pubblicazione" %>
-        <%= f.datetime_local_field :publish_at, required: true, "aria-invalid": post.errors.include?(:publish_at) %>
+        <%= f.datetime_local_field :publish_at, "aria-invalid": post.errors.include?(:publish_at) %>
         <%= field_error(post, :publish_at) %>
+        <span class="aiuto">Vuota: si pubblica subito. Futura: si programma.</span>
       </div>
 
       <div class="campo">

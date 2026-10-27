@@ -95,6 +95,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".testo-post", text: "Mancano pochi giorni all'Open Day!"
     assert_select ".chip-facebook"
     assert_select ".galleria figure.provvisoria", 1
+    assert_select ".galleria [data-lightbox-download*='disposition=attachment']", 1 # per l'iconcina di download
   end
 
   test "risponde 404 per un post che non esiste" do

@@ -1,0 +1,67 @@
+<%# Anteprima compatta di un post, nel popup della vista a calendario: stessi bottoni della pagina del post,
+    link ai social e alla pagina completa. Dopo un'azione si torna a return_to (il calendario). %>
+<article class="anteprima-post" aria-labelledby="anteprima-titolo-<%= post.id %>">
+  <header class="anteprima-testa">
+    <div class="scheda-meta">
+      <span class="scheda-data"><%= publish_time(post) %></span>
+      <% if post.publish_at %><span class="scheda-quando"><%= days_label(post.publish_at) %></span><% end %>
+    </div>
+    <h2 id="anteprima-titolo-<%= post.id %>"><%= post.title %></h2>
+    <div class="scheda-stato">
+      <%= status_pill(post) %>
+      <% if post.publications.any? %>
+        <span class="nota-stato">su</span>
+        <% post.publications.each do |publication| %>
+          <% page = publication.social_page %>
+          <% if publication.on_social? && publication.remote_url.present? %>
+            <%= link_to publication.remote_url, target: "_blank", rel: "noopener", class: "chip-link",
+                        title: "Apri il post su #{page.platform_label}" do %><%= social_page_chip(page) %> <span class="link-esterno">Apri il post ↗</span><% end %>
+          <% else %>
+            <%= link_to page.url, target: "_blank", rel: "noopener", class: "chip-link", title: "Apri la pagina #{page.name}" do %><%= social_page_chip(page) %><% end %>
+          <% end %>
+          <% if publication.sync_error.present? %><span class="errore-campo">Ultimo errore: <%= publication.sync_error %></span><% end %>
+        <% end %>
+      <% else %>
+        <span class="nota-stato">nessuna pagina social collegata</span>
+      <% end %>
+    </div>
+  </header>
+
+  <%= render "azioni", post:, return_to: %>
+
+  <div class="anteprima-corpo">
+    <% if post.media.any? %>
+      <div class="anteprima-file">
+        <% post.ordered_media.each do |file| %>
+          <figure class="<%= 'provvisoria' if placeholder?(file) %>">
+            <% if file.image? %>
+              <%= image_tag file.variant(:thumb), alt: file.filename.to_s, loading: "lazy",
+                            title: "Clic per vederla a tutto schermo", data: lightbox_data(file, group: "anteprima-#{post.id}") %>
+            <% else %>
+              <%= video_tag rails_blob_path(file, disposition: "inline"), controls: true, preload: "metadata" %>
+              <button type="button" class="lightbox-apri" title="Guarda a tutto schermo" aria-label="Guarda <%= file.filename %> a tutto schermo"
+                      <%= tag.attributes(data: lightbox_data(file, group: "anteprima-#{post.id}")) %>>⤢</button>
+            <% end %>
+          </figure>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if post.body.present? %>
+      <div class="testo-post anteprima-testo"><%= post.body %></div>
+    <% else %>
+      <p class="vuoto">Il testo non è ancora stato scritto.</p>
+    <% end %>
+
+    <% if post.notes.present? %>
+      <div class="anteprima-note <%= 'riquadro-manca' if post.draft? %>">
+        <h3>Note</h3>
+        <div class="note"><%= simple_format(post.notes) %></div>
+      </div>
+    <% end %>
+  </div>
+
+  <footer class="anteprima-piede">
+    <%= link_to "Apri la pagina del post →", post_path(post), class: "anteprima-link" %>
+  </footer>
+</article>

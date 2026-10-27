@@ -1,0 +1,29 @@
+<%# I bottoni di un post (pubblica, programma, spubblica, modifica, elimina): pagina del post e popup del calendario.
+    return_to: dove tornare dopo l'azione (per esempio il calendario); senza, si torna alla pagina del post. %>
+<% return_to = local_assigns[:return_to].presence %>
+<% back = return_to ? { return_to: } : {} %>
+<div class="azioni-post">
+  <% pages = post.social_pages.map(&:name).to_sentence.presence || "nessuna pagina" %>
+  <% if post.publishable? %>
+    <%= button_to "Pubblica", publish_post_path(post), method: :patch, params: back, class: "bottone bottone-principale",
+                  form: { data: { turbo_confirm: "Pubblicare adesso il post su #{pages}?", turbo_submits_with: "Pubblicazione in corso…" } } %>
+    <span class="aiuto">Nessuna data impostata: il post esce subito su <%= pages %>. Per programmarlo, imposta una data futura con «Modifica».</span>
+  <% elsif post.schedulable? %>
+    <%= button_to "Programma", schedule_post_path(post), method: :patch, params: back, class: "bottone bottone-principale",
+                  form: { data: { turbo_submits_with: "Programmazione in corso…" } } %>
+    <span class="aiuto">Uscirà su <%= pages %> <%= publish_time(post) %>.</span>
+  <% elsif post.date_expired? %>
+    <span class="aiuto aiuto-attenzione">La data di pubblicazione (<%= publish_time(post) %>) è passata: con «Modifica» cancellala per pubblicarlo subito, oppure impostane una futura per programmarlo.</span>
+  <% elsif post.published? %>
+    <%= button_to "Spubblica", unpublish_post_path(post), method: :patch, params: back, class: "bottone bottone-secondario",
+                  form: { data: { turbo_confirm: "Togliere il post da #{pages}? Nell'app resterà come bozza." } } %>
+    <span class="aiuto">Il post sparisce dai social e torna bozza.</span>
+  <% end %>
+
+  <span class="azioni-separatore" aria-hidden="true"></span>
+  <%= link_to "Modifica", edit_post_path(post), class: "bottone bottone-secondario" %>
+  <% confirm = post.draft? ? "Eliminare definitivamente il post «#{post.title}», con le sue immagini e i suoi video?" :
+                              "Eliminare definitivamente il post «#{post.title}»? Sparirà anche da #{pages}." %>
+  <%= button_to "Elimina", post_path(post), method: :delete, params: back, class: "bottone bottone-pericolo",
+                form: { data: { turbo_confirm: confirm } } %>
+</div>

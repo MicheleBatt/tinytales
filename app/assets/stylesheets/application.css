@@ -206,8 +206,11 @@ h1, h2, h3 { font-family: var(--titoli); font-weight: 600; line-height: 1.25; te
   box-shadow: var(--ombra);
   overflow: hidden;
 }
-.vista-griglia .riga:hover { border-color: var(--linea-forte); box-shadow: 0 4px 12px rgba(29, 34, 48, 0.08); }
+/* Al passaggio del mouse la scheda si solleva di qualche pixel, con l'ombra un po' più ampia. */
+.vista-griglia .riga { transition: transform 0.18s ease-out, box-shadow 0.18s ease-out, border-color 0.18s ease-out; }
+.vista-griglia .riga:hover { transform: translateY(-3px); border-color: var(--linea-forte); box-shadow: 0 8px 18px rgba(29, 34, 48, 0.12); }
 .vista-griglia .riga.scheda-ritardo { box-shadow: inset 0 3px 0 var(--rosso); }
+.vista-griglia .riga.scheda-ritardo:hover { box-shadow: inset 0 3px 0 var(--rosso), 0 8px 18px rgba(29, 34, 48, 0.12); }
 .vista-griglia .riga-miniatura { grid-area: foto; width: 100%; height: auto; aspect-ratio: 4 / 3; border: 0; border-bottom: 1px solid var(--linea); border-radius: 0; }
 .vista-griglia .riga-miniatura img { object-position: center top; }
 .vista-griglia .riga-conta { right: 6px; bottom: 6px; font-size: 11px; padding: 2px 5px; }
@@ -341,6 +344,41 @@ h1, h2, h3 { font-family: var(--titoli); font-weight: 600; line-height: 1.25; te
 .calendario-senza-data { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 8px 12px; border-top: 1px solid var(--linea); }
 .calendario-senza-data-titolo { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--tenue); margin-right: 4px; }
 .calendario-senza-data .evento { max-width: 260px; }
+
+/* Popup con l'anteprima di un post, aperto dal calendario. */
+.popup-anteprima {
+  width: min(720px, calc(100vw - 24px));
+  max-height: calc(100vh - 40px);
+  padding: 0;
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  background: var(--superficie);
+  color: var(--inchiostro);
+  box-shadow: 0 20px 60px rgba(16, 20, 30, 0.3);
+}
+.popup-anteprima::backdrop { background: rgba(16, 20, 30, 0.45); }
+.popup-anteprima-interno { position: relative; padding: 16px 18px 12px; }
+.popup-anteprima-chiudi { position: absolute; top: 10px; right: 10px; }
+.popup-anteprima-contenuto[aria-busy="true"] { min-height: 160px; background: linear-gradient(90deg, var(--superficie-2), var(--superficie), var(--superficie-2)) 0 0 / 200% 100%; border-radius: var(--raggio); animation: carica 1.2s linear infinite; }
+@keyframes carica { to { background-position: -200% 0; } }
+.anteprima-post { display: flex; flex-direction: column; gap: 10px; }
+.anteprima-testa { display: flex; flex-direction: column; gap: 5px; padding-right: 36px; }
+.anteprima-testa h2 { font-size: 17px; margin: 0; text-wrap: balance; }
+.anteprima-testa .scheda-stato { flex-wrap: wrap; }
+.link-esterno { font-size: 12px; color: var(--blu); }
+.anteprima-post .azioni-post { margin: 0; padding-bottom: 10px; border-bottom: 1px solid var(--linea); }
+.anteprima-corpo { display: flex; flex-direction: column; gap: 10px; }
+.anteprima-file { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.anteprima-file figure { margin: 0; position: relative; flex: 0 0 auto; }
+.anteprima-file img, .anteprima-file video { width: 96px; height: 96px; object-fit: cover; border-radius: 4px; border: 1px solid var(--linea); display: block; background: var(--inchiostro); }
+.anteprima-file .provvisoria img { outline: 2px dashed var(--giallo); outline-offset: -2px; }
+.anteprima-file .scarica { width: 22px; height: 22px; top: 4px; right: 4px; }
+.anteprima-testo { max-height: 260px; overflow-y: auto; font-size: 13px; }
+.anteprima-note { padding: 8px 10px; border: 1px solid var(--linea); border-radius: var(--raggio); background: var(--superficie-2); font-size: 12.5px; }
+.anteprima-note.riquadro-manca { background: var(--giallo-chiaro); border-color: #EED9AE; }
+.anteprima-note h3 { font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--tenue); }
+.anteprima-piede { display: flex; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--linea); }
+.anteprima-link { font-size: 13px; font-weight: 500; }
 
 /* ---------- pillole di stato ---------- */
 
@@ -477,6 +515,8 @@ fieldset[disabled] .scelta { opacity: 0.6; cursor: not-allowed; }
 .scelta-draft:has(input:checked) { border-color: var(--giallo); background: var(--giallo-chiaro); color: var(--giallo); }
 .scelta-published:has(input:checked) { border-color: var(--verde); background: var(--verde-chiaro); color: var(--verde); }
 .aiuto { font-size: 12.5px; color: var(--tenue); margin: 0 0 6px; }
+.aiuto.aiuto-attenzione { color: var(--giallo); }
+.campo .aiuto { margin: 3px 0 0; font-size: 12px; }
 .errore-campo { font-size: 12.5px; font-weight: 500; color: var(--rosso); }
 .riquadro-titolo { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
 .riquadro-testo .riquadro-titolo { margin: 0; }
@@ -643,6 +683,32 @@ textarea.testo-post { resize: vertical; min-height: 320px; line-height: 1.5; }
 /* ---------- anteprima a tutto schermo ---------- */
 
 .apribile, [data-lightbox] { cursor: zoom-in; }
+
+/* Iconcina per scaricare il file, nell'angolo in alto a destra di ogni anteprima (aggiunta dal controller lightbox). */
+.scaricabile { position: relative; }
+span.scaricabile { display: block; }
+.proposta-post-foto span.scaricabile { height: 100%; }
+.scarica {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: rgba(16, 20, 30, 0.6);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.15s, background 0.15s;
+}
+.scarica:hover, .scarica:focus-visible { opacity: 1; background: var(--blu); }
+.lightbox-apri.con-scarica { right: 33px; }
+.msg-allegati .scarica { top: 6px; right: 6px; width: 22px; height: 22px; }
 .galleria-ordinabile figure .apribile { cursor: zoom-in; }
 .lightbox-apri {
   position: absolute;
@@ -753,4 +819,6 @@ textarea.testo-post { resize: vertical; min-height: 320px; line-height: 1.5; }
 @media (prefers-reduced-motion: reduce) {
   .cursore, .puntini i, .assistente.al-lavoro .assistente-testa h2::after, .appena-applicato { animation: none; }
   .puntini i { opacity: 0.8; }
+  .vista-griglia .riga { transition: none; }
+  .vista-griglia .riga:hover { transform: none; }
 }

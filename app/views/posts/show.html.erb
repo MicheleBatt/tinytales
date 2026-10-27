@@ -23,31 +23,7 @@
     <% end %>
   </div>
 
-  <div class="azioni-post">
-    <% pages = @post.social_pages.map(&:name).to_sentence.presence || "nessuna pagina" %>
-    <% if @post.publishable? %>
-      <%= button_to "Pubblica", publish_post_path(@post), method: :patch, class: "bottone bottone-principale",
-                    form: { data: { turbo_confirm: "Pubblicare adesso il post su #{pages}?", turbo_submits_with: "Pubblicazione in corso…" } } %>
-      <span class="aiuto">L'ora di pubblicazione è arrivata: il post esce subito su <%= pages %>.</span>
-    <% elsif @post.schedulable? %>
-      <%= button_to "Programma", schedule_post_path(@post), method: :patch, class: "bottone bottone-principale",
-                    form: { data: { turbo_submits_with: "Programmazione in corso…" } } %>
-      <span class="aiuto">Uscirà su <%= pages %> <%= publish_time(@post) %>.</span>
-    <% elsif @post.draft? %>
-      <span class="aiuto">Per pubblicarlo o programmarlo, imposta prima data e ora con «Modifica».</span>
-    <% elsif @post.published? %>
-      <%= button_to "Spubblica", unpublish_post_path(@post), method: :patch, class: "bottone bottone-secondario",
-                    form: { data: { turbo_confirm: "Togliere il post da #{pages}? Nell'app resterà come bozza." } } %>
-      <span class="aiuto">Il post sparisce dai social e torna bozza.</span>
-    <% end %>
-
-    <span class="azioni-separatore" aria-hidden="true"></span>
-    <%= link_to "Modifica", edit_post_path(@post), class: "bottone bottone-secondario" %>
-    <% confirm = @post.draft? ? "Eliminare definitivamente il post «#{@post.title}», con le sue immagini e i suoi video?" :
-                                "Eliminare definitivamente il post «#{@post.title}»? Sparirà anche da #{pages}." %>
-    <%= button_to "Elimina", post_path(@post), method: :delete, class: "bottone bottone-pericolo",
-                  form: { data: { turbo_confirm: confirm } } %>
-  </div>
+  <%= render "azioni", post: @post %>
 </header>
 
 <% unconnected = @post.publications.map(&:social_page).reject(&:connected?) %>

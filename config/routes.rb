@@ -8,6 +8,7 @@ Rails.application.routes.draw do
       patch :schedule
       patch :unpublish
       patch :resync
+      get :preview, path: "anteprima"
     end
   end
 

@@ -14,7 +14,9 @@ class Post < ApplicationRecord
 
   class TransitionError < StandardError; end
 
-  validates :title, :publish_at, presence: true
+  validates :title, presence: true
+  # La data può mancare solo nelle bozze: chi è programmato o pubblicato ce l'ha sempre.
+  validates :publish_at, presence: true, unless: :draft?
   validate :media_are_images_or_videos
   validate :scheduled_time_in_future, if: -> { scheduled? && publish_at_changed? && publish_at.present? }
 
@@ -55,14 +57,18 @@ class Post < ApplicationRecord
     publish_at.present? && publish_at < now && !published?
   end
 
-  # Ogni post nasce bozza. Da bozza si pubblica, se l'ora è arrivata, o si programma, se è nel futuro.
+  # Ogni post nasce bozza. Da bozza:
+  # - senza data si pubblica subito;
+  # - con una data futura si programma;
+  # - con una data passata non si fa niente, finché non si toglie la data o se ne mette una nuova.
   # Un post pubblicato si può sempre spubblicare: torna bozza.
-  def publishable?(now = Time.current) = draft? && publish_at.present? && publish_at <= now
+  def publishable?(_now = Time.current) = draft? && publish_at.nil?
   def schedulable?(now = Time.current) = draft? && publish_at.present? && publish_at > now
+  def date_expired?(now = Time.current) = draft? && publish_at.present? && publish_at <= now
 
-  # Pubblicando dopo l'ora prevista, la data diventa quella vera di uscita.
+  # La data diventa quella vera di uscita.
   def publish!(now = Time.current)
-    raise TransitionError, "Si può pubblicare solo una bozza con l'ora di pubblicazione già arrivata." unless publishable?(now)
+    raise TransitionError, "Si può pubblicare subito solo una bozza senza data di pubblicazione." unless publishable?(now)
 
     update!(status: :published, publish_at: now)
   end
