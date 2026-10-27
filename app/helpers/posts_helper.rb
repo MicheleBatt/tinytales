@@ -32,6 +32,19 @@ module PostsHelper
     end
   end
 
+  # Le piattaforme del post, per i messaggi di conferma: «sulla pagina Facebook», «dalle pagine Facebook e Instagram».
+  # from: true per «dalla/dalle» (togliere), altrimenti «sulla/sulle» (pubblicare).
+  def social_pages_phrase(post, from: false)
+    order = SocialPage::PLATFORMS.keys
+    platforms = post.social_pages.map(&:platform).uniq.sort_by { |platform| order.index(platform) || order.size }
+                    .map { |platform| SocialPage::PLATFORMS.fetch(platform, platform) }
+    return from ? "da nessuna pagina social" : "su nessuna pagina social" if platforms.empty?
+
+    one = platforms.one?
+    preposition = from ? (one ? "dalla" : "dalle") : (one ? "sulla" : "sulle")
+    "#{preposition} #{one ? 'pagina' : 'pagine'} #{platforms.to_sentence(two_words_connector: ' e ', last_word_connector: ' e ')}"
+  end
+
   def social_page_chip(page)
     tag.span(page.platform_label, class: "chip chip-#{page.platform}", title: page.name)
   end

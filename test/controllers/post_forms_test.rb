@@ -70,7 +70,7 @@ class PostFormsTest < ActionDispatch::IntegrationTest
     get new_post_path
     assert_select "input[name='post[status]']", 0
     assert_select "input[name='post[publish_at]']:not([required])"
-    assert_select ".campo .aiuto", /Vuota: si pubblica subito/
+    assert_select ".campo .aiuto", /Facoltativa: è la data prevista/
     assert_select ".stato-fisso .pill-draft", "Bozza"
   end
 

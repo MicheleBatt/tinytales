@@ -57,18 +57,17 @@ class Post < ApplicationRecord
     publish_at.present? && publish_at < now && !published?
   end
 
-  # Ogni post nasce bozza. Da bozza:
-  # - senza data si pubblica subito;
-  # - con una data futura si programma;
-  # - con una data passata non si fa niente, finché non si toglie la data o se ne mette una nuova.
+  # Ogni post nasce bozza. Una bozza si può sempre:
+  # - pubblicare subito, qualunque data abbia: la data diventa quella vera di uscita;
+  # - programmare, a una data futura (scelta nella finestra di Programma, o quella già impostata).
   # Un post pubblicato si può sempre spubblicare: torna bozza.
-  def publishable?(_now = Time.current) = draft? && publish_at.nil?
+  def publishable?(_now = Time.current) = draft?
   def schedulable?(now = Time.current) = draft? && publish_at.present? && publish_at > now
+  # Una bozza con la data passata: per programmarla bisogna sceglierne una nuova.
   def date_expired?(now = Time.current) = draft? && publish_at.present? && publish_at <= now
 
-  # La data diventa quella vera di uscita.
   def publish!(now = Time.current)
-    raise TransitionError, "Si può pubblicare subito solo una bozza senza data di pubblicazione." unless publishable?(now)
+    raise TransitionError, "Si può pubblicare solo una bozza." unless publishable?(now)
 
     update!(status: :published, publish_at: now)
   end
@@ -79,7 +78,7 @@ class Post < ApplicationRecord
   end
 
   def schedule!(now = Time.current)
-    raise TransitionError, "Si può programmare solo una bozza con l'ora di pubblicazione nel futuro." unless schedulable?(now)
+    raise TransitionError, "Per programmare una bozza serve una data di pubblicazione nel futuro." unless schedulable?(now)
 
     update!(status: :scheduled)
   end

@@ -6,28 +6,46 @@ class PostStatusTest < ActionDispatch::IntegrationTest
   setup { travel_to Time.zone.parse("2026-11-01 10:00") }
   teardown { travel_back }
 
-  test "una bozza con l'ora nel futuro mostra Programma" do
+  test "una bozza mostra sempre Pubblica Ora e Programma; con una data futura il bottone blu è Programma" do
     get post_path(posts(:mensa))
-    assert_select "form[action='#{schedule_post_path(posts(:mensa))}'] button", "Programma"
-    assert_select "form[action='#{publish_post_path(posts(:mensa))}']", 0
+    assert_select "form[action='#{schedule_post_path(posts(:mensa))}'] button.bottone-principale", "Programma"
+    assert_select "form[action='#{publish_post_path(posts(:mensa))}'] button.bottone-secondario", "Pubblica Ora"
+    assert_select "form[action='#{schedule_post_path(posts(:mensa))}'][data-confirm-datetime-value='2026-11-12T20:30']"
+    assert_select "form[action='#{publish_post_path(posts(:mensa))}'][data-turbo-confirm*='verrà sostituita con quella di uscita']"
+    assert_select ".azioni-post .aiuto", /Data prevista: giovedì 12 novembre 2026/
   end
 
-  test "una bozza con la data passata non mostra né Pubblica né Programma, e spiega come fare" do
+  test "una bozza senza data mostra entrambi i bottoni; la finestra di Programma parte senza data" do
+    get post_path(posts(:festa_di_natale))
+    assert_select "form[action='#{publish_post_path(posts(:festa_di_natale))}'] button.bottone-principale", "Pubblica Ora"
+    assert_select "form[action='#{schedule_post_path(posts(:festa_di_natale))}'] button", "Programma"
+    assert_select "form[action$='/schedule'][data-confirm-datetime-name=publish_at]:not([data-confirm-datetime-value])"
+    assert_select ".azioni-post .aiuto", /Nessuna data prevista: con «Programma» la scegli tu/
+  end
+
+  test "una bozza con la data passata si pubblica subito, e la data diventa quella di uscita" do
     posts(:mensa).update_column(:publish_at, 1.hour.ago)
     get post_path(posts(:mensa))
-    assert_select "form[action$='/publish'], form[action$='/schedule']", 0
-    assert_select ".azioni-post .aiuto-attenzione", /è passata: con «Modifica» cancellala per pubblicarlo subito/
+    assert_select "form[action$='/publish'] button", "Pubblica Ora"
+    assert_select "form[action$='/schedule'] button", "Programma"
+    assert_select ".azioni-post .aiuto-attenzione", /è passata: per programmarlo scegline una nuova con «Programma»/
 
     patch publish_post_path(posts(:mensa))
-    assert posts(:mensa).reload.draft?
-    assert_empty @facebook.calls
+    assert posts(:mensa).reload.published?
+    assert_equal Time.current, posts(:mensa).publish_at
+    assert_equal true, @facebook.calls.find { |c| c.path == "1234/feed" }.params[:published]
   end
 
-  test "una bozza senza data mostra Pubblica, non Programma" do
-    get post_path(posts(:festa_di_natale))
-    assert_select "form[action='#{publish_post_path(posts(:festa_di_natale))}'] button", "Pubblica"
-    assert_select "form[action$='/schedule']", 0
-    assert_select ".azioni-post .aiuto", /Nessuna data impostata: il post esce subito/
+  test "una bozza con la data passata si programma con una data nuova, non con quella vecchia" do
+    posts(:mensa).update_column(:publish_at, 1.hour.ago)
+    patch schedule_post_path(posts(:mensa))
+    assert posts(:mensa).reload.draft?
+    follow_redirect!
+    assert_select ".avviso-ritardo", /scegli una data di pubblicazione nel futuro/
+
+    patch schedule_post_path(posts(:mensa)), params: { publish_at: "2026-11-05T20:30" }
+    assert posts(:mensa).reload.scheduled?
+    assert_equal Time.zone.parse("2026-11-05 20:30"), posts(:mensa).publish_at
   end
 
   test "Programma programma il post su Facebook e poi cambia lo stato" do
@@ -188,5 +206,62 @@ class PostStatusTest < ActionDispatch::IntegrationTest
 
     delete post_path(posts(:mensa)), params: { return_to: back }
     assert_redirected_to back
+  end
+
+  test "le azioni chiedono conferma con la finestra dell'app: titolo, bottone e tono" do
+    get post_path(posts(:festa_di_natale))
+    assert_select "form[action='#{publish_post_path(posts(:festa_di_natale))}'][data-confirm-title='Pubblicare adesso?'][data-confirm-button='Pubblica Ora']:not([data-confirm-tone])"
+    assert_select "form[action='#{post_path(posts(:festa_di_natale))}'][data-confirm-tone=pericolo][data-confirm-button=Elimina][data-turbo-confirm*='L'azione è irreversibile']"
+
+    get post_path(posts(:open_day))
+    assert_select "form[action='#{unpublish_post_path(posts(:open_day))}'][data-confirm-tone=pericolo][data-confirm-button=Spubblica]"
+  end
+
+  test "Programma chiede conferma con la data già compilata, modificabile" do
+    get post_path(posts(:mensa))
+    assert_select "form[action='#{schedule_post_path(posts(:mensa))}'][data-confirm-title='Programmare il post?']" \
+                  "[data-confirm-datetime-name=publish_at][data-confirm-datetime-value='2026-11-12T20:30']"
+  end
+
+  test "Programma con una nuova data la usa su Facebook e la salva nell'app" do
+    patch schedule_post_path(posts(:mensa)), params: { publish_at: "2026-11-20T18:15" }
+
+    post = posts(:mensa).reload
+    assert post.scheduled?
+    assert_equal Time.zone.parse("2026-11-20 18:15"), post.publish_at
+    feed = @facebook.calls.find { |c| c.path == "1234/feed" }
+    assert_equal Time.zone.parse("2026-11-20 18:15").to_i, feed.params[:scheduled_publish_time]
+    follow_redirect!
+    assert_select ".avviso-ok", /programmato sui social per venerdì 20 novembre 2026, ore 18.15/
+  end
+
+  test "se Facebook rifiuta la nuova data, nell'app resta quella di prima" do
+    patch schedule_post_path(posts(:mensa)), params: { publish_at: "2026-12-25T10:00" } # oltre 30 giorni
+
+    post = posts(:mensa).reload
+    assert post.draft?
+    assert_equal Time.zone.parse("2026-11-12 20:30"), post.publish_at
+    assert_empty @facebook.calls
+    follow_redirect!
+    assert_select ".avviso-ritardo", /al massimo 30 giorni prima/
+  end
+
+  test "una data non valida dalla finestra non cambia niente" do
+    patch schedule_post_path(posts(:mensa)), params: { publish_at: "domani" }
+    assert posts(:mensa).reload.draft?
+    assert_equal Time.zone.parse("2026-11-12 20:30"), posts(:mensa).publish_at
+    follow_redirect!
+    assert_select ".avviso-ritardo", /non è valida/
+  end
+
+  test "i messaggi di conferma nominano le piattaforme, non il nome della pagina" do
+    get post_path(posts(:mensa))
+    assert_select "form[action$='/publish'][data-turbo-confirm^='Il post «La nostra mensa» viene pubblicato subito sulla pagina Facebook.']"
+    assert_select "form[action$='/schedule'][data-turbo-confirm*='verrà pubblicato sulla pagina Facebook in automatico']"
+    assert_select "form[data-turbo-confirm*='Creola']", 0
+
+    get post_path(posts(:open_day))
+    assert_select "form[action$='/unpublish'][data-turbo-confirm*='sparisce dalla pagina Facebook.']"
+    assert_select "form[action='#{post_path(posts(:open_day))}'][data-turbo-confirm*='sparirà anche dalla pagina Facebook']"
   end
 end

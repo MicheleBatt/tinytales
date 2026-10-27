@@ -3,27 +3,43 @@
 <% return_to = local_assigns[:return_to].presence %>
 <% back = return_to ? { return_to: } : {} %>
 <div class="azioni-post">
-  <% pages = post.social_pages.map(&:name).to_sentence.presence || "nessuna pagina" %>
-  <% if post.publishable? %>
-    <%= button_to "Pubblica", publish_post_path(post), method: :patch, params: back, class: "bottone bottone-principale",
-                  form: { data: { turbo_confirm: "Pubblicare adesso il post su #{pages}?", turbo_submits_with: "Pubblicazione in corso…" } } %>
-    <span class="aiuto">Nessuna data impostata: il post esce subito su <%= pages %>. Per programmarlo, imposta una data futura con «Modifica».</span>
-  <% elsif post.schedulable? %>
-    <%= button_to "Programma", schedule_post_path(post), method: :patch, params: back, class: "bottone bottone-principale",
-                  form: { data: { turbo_submits_with: "Programmazione in corso…" } } %>
-    <span class="aiuto">Uscirà su <%= pages %> <%= publish_time(post) %>.</span>
-  <% elsif post.date_expired? %>
-    <span class="aiuto aiuto-attenzione">La data di pubblicazione (<%= publish_time(post) %>) è passata: con «Modifica» cancellala per pubblicarlo subito, oppure impostane una futura per programmarlo.</span>
+  <% on_pages = social_pages_phrase(post) %>
+  <% from_pages = social_pages_phrase(post, from: true) %>
+  <% if post.draft? %>
+    <%# Il bottone blu è quello più probabile: Programma se c'è già una data futura, altrimenti Pubblica Ora. %>
+    <% future = post.schedulable? %>
+    <% replaced = post.publish_at ? " La data impostata (#{publish_time(post)}) verrà sostituita con quella di uscita." : "" %>
+    <%= button_to "Pubblica Ora", publish_post_path(post), method: :patch, params: back, class: "bottone #{future ? 'bottone-secondario' : 'bottone-principale'}",
+                  form: { data: { turbo_confirm: "Il post «#{post.title}» viene pubblicato subito #{on_pages}.#{replaced}", turbo_submits_with: "Pubblicazione in corso…",
+                                  confirm_title: "Pubblicare adesso?", confirm_button: "Pubblica Ora" } } %>
+    <%# Nella finestra di Programma la data è già compilata se è futura; altrimenti va scelta. %>
+    <%= button_to "Programma", schedule_post_path(post), method: :patch, params: back, class: "bottone #{future ? 'bottone-principale' : 'bottone-secondario'}",
+                  form: { data: { turbo_confirm: future ? "Il post «#{post.title}» verrà pubblicato #{on_pages} in automatico, alla data e all'ora qui sotto. Puoi ancora cambiarle." :
+                                                          "Il post «#{post.title}» verrà pubblicato #{on_pages} in automatico. Scegli qui sotto la data e l'ora di pubblicazione.",
+                                  turbo_submits_with: "Programmazione in corso…",
+                                  confirm_title: "Programmare il post?", confirm_button: "Programma",
+                                  confirm_datetime_name: "publish_at",
+                                  confirm_datetime_value: (post.publish_at.in_time_zone.strftime("%Y-%m-%dT%H:%M") if future),
+                                  confirm_datetime_label: "Data e ora di pubblicazione",
+                                  confirm_datetime_help: "Facebook accetta da 10 minuti a 30 giorni da adesso." } } %>
+    <% if future %>
+      <span class="aiuto">Data prevista: <%= publish_time(post) %>.</span>
+    <% elsif post.date_expired? %>
+      <span class="aiuto aiuto-attenzione">La data prevista (<%= publish_time(post) %>) è passata: per programmarlo scegline una nuova con «Programma».</span>
+    <% else %>
+      <span class="aiuto">Nessuna data prevista: con «Programma» la scegli tu.</span>
+    <% end %>
   <% elsif post.published? %>
     <%= button_to "Spubblica", unpublish_post_path(post), method: :patch, params: back, class: "bottone bottone-secondario",
-                  form: { data: { turbo_confirm: "Togliere il post da #{pages}? Nell'app resterà come bozza." } } %>
-    <span class="aiuto">Il post sparisce dai social e torna bozza.</span>
+                  form: { data: { turbo_confirm: "Il post «#{post.title}» sparisce #{from_pages}. Nell'app resterà come bozza.",
+                                  confirm_title: "Togliere il post dai social?", confirm_button: "Spubblica", confirm_tone: "pericolo" } } %>
+    <span class="aiuto">Il post sparisce dai social e torna in bozza.</span>
   <% end %>
 
   <span class="azioni-separatore" aria-hidden="true"></span>
   <%= link_to "Modifica", edit_post_path(post), class: "bottone bottone-secondario" %>
-  <% confirm = post.draft? ? "Eliminare definitivamente il post «#{post.title}», con le sue immagini e i suoi video?" :
-                              "Eliminare definitivamente il post «#{post.title}»? Sparirà anche da #{pages}." %>
+  <% confirm = post.draft? ? "Il post «#{post.title}» verrà cancellato definitivamente, con le sue immagini e i suoi video. L'azione è irreversibile." :
+                              "Il post «#{post.title}» verrà cancellato definitivamente, e sparirà anche #{from_pages}. L'azione è irreversibile." %>
   <%= button_to "Elimina", post_path(post), method: :delete, params: back, class: "bottone bottone-pericolo",
-                form: { data: { turbo_confirm: confirm } } %>
+                form: { data: { turbo_confirm: confirm, confirm_title: "Eliminare il post?", confirm_button: "Elimina", confirm_tone: "pericolo" } } %>
 </div>

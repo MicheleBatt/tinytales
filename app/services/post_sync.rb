@@ -19,7 +19,7 @@ class PostSync
   end
 
   def publish!
-    ensure_transition!(post.publishable?(@now), "Si può pubblicare subito solo una bozza senza data di pubblicazione: se la data è passata, cancellala o impostane una futura.")
+    ensure_transition!(post.publishable?(@now), "Si può pubblicare solo una bozza.")
     post.validate!
     create_everywhere(:publish)
     post.publish!(@now)
@@ -27,7 +27,7 @@ class PostSync
   end
 
   def schedule!
-    ensure_transition!(post.schedulable?(@now), "Si può programmare solo una bozza con l'ora di pubblicazione nel futuro.")
+    ensure_transition!(post.schedulable?(@now), "Per programmare il post scegli una data di pubblicazione nel futuro.")
     post.validate!
     create_everywhere(:schedule)
     post.schedule!(@now)

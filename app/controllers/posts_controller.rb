@@ -73,7 +73,15 @@ class PostsController < ApplicationController
     sync(notice: "Post pubblicato sui social.") { |s| s.publish! }
   end
 
+  # Dalla finestra di conferma può arrivare una nuova data (publish_at): vale per Facebook e per l'app.
+  # Viene salvata solo se la programmazione riesce; se Facebook rifiuta, resta quella di prima.
   def schedule
+    if params[:publish_at].present?
+      time = Time.zone.parse(params[:publish_at].to_s) rescue nil
+      return redirect_to(back_path || @post, alert: "La data scelta non è valida.", status: :see_other) unless time
+
+      @post.publish_at = time
+    end
     sync(notice: "Post programmato sui social per #{I18n.l(@post.publish_at, format: :long)}.") { |s| s.schedule! }
   end
 

@@ -291,6 +291,35 @@ h1, h2, h3 { font-family: var(--titoli); font-weight: 600; line-height: 1.25; te
 .proposte-riepilogo { flex: 1 1 260px; margin: 0; font-size: 12.5px; color: var(--tenue); }
 .proposte-bottoni { display: flex; gap: 8px; margin-left: auto; }
 
+/* ---------- finestra di conferma (al posto di quella del browser) ---------- */
+
+.conferma {
+  width: min(440px, calc(100vw - 24px));
+  padding: 0;
+  border: 1px solid var(--linea);
+  border-top: 3px solid var(--blu);
+  border-radius: 10px;
+  background: var(--superficie);
+  color: var(--inchiostro);
+  box-shadow: 0 20px 60px rgba(16, 20, 30, 0.3);
+}
+.conferma.conferma-pericolo { border-top-color: var(--rosso); }
+.conferma::backdrop { background: rgba(16, 20, 30, 0.45); }
+.conferma[open] { animation: conferma-entra 0.14s ease-out; }
+@keyframes conferma-entra { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
+.conferma-testa { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px 4px; }
+.conferma-testa h2 { font-size: 16px; margin: 0; }
+.conferma-messaggio { margin: 0; padding: 4px 16px 16px; font-size: 13.5px; line-height: 1.5; color: var(--inchiostro); }
+.conferma-campo { display: flex; flex-direction: column; gap: 4px; padding: 0 16px 16px; }
+.conferma-campo label { font-size: 12.5px; font-weight: 600; color: var(--inchiostro); }
+.conferma-campo input { font: inherit; font-size: 14px; height: 34px; padding: 0 8px; width: fit-content; border: 1px solid var(--linea-forte); border-radius: var(--raggio); color: var(--inchiostro); background: var(--superficie); }
+.conferma-campo input:focus { outline: 2px solid var(--blu-chiaro); border-color: var(--blu); }
+.conferma-campo input[aria-invalid="true"] { border-color: var(--rosso); }
+.conferma-campo .aiuto { margin: 0; font-size: 12px; }
+.conferma-piede { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--linea); background: var(--superficie-2); border-radius: 0 0 10px 10px; }
+.bottone.bottone-pericolo-pieno { background: var(--rosso); border-color: var(--rosso); color: #fff; }
+.bottone.bottone-pericolo-pieno:hover { background: #962821; border-color: #962821; }
+
 /* ---------- vista a calendario ---------- */
 
 .calendario { background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--raggio); box-shadow: var(--ombra); overflow: hidden; }
@@ -821,4 +850,5 @@ span.scaricabile { display: block; }
   .puntini i { opacity: 0.8; }
   .vista-griglia .riga { transition: none; }
   .vista-griglia .riga:hover { transform: none; }
+  .conferma[open] { animation: none; }
 }

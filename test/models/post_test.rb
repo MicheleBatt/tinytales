@@ -13,7 +13,7 @@ class PostTest < ActiveSupport::TestCase
     assert_not post.valid?
   end
 
-  test "una bozza senza data si pubblica subito, non si programma; la data diventa quella di uscita" do
+  test "una bozza senza data si pubblica subito; si programma solo dopo aver scelto una data futura" do
     now = Time.zone.parse("2026-11-12 20:30")
     post = posts(:festa_di_natale)
 
@@ -26,33 +26,30 @@ class PostTest < ActiveSupport::TestCase
     assert_equal now, post.publish_at
   end
 
-  test "una bozza con la data passata, o arrivata, non si pubblica né si programma" do
+  test "una bozza con la data passata si pubblica subito, ma non si programma a quella data" do
     post = posts(:mensa) # giovedì 12 novembre 2026, 20.30
-    [ Time.zone.parse("2026-11-12 20:30"), Time.zone.parse("2026-11-20 10:00") ].each do |now|
-      assert post.date_expired?(now)
-      assert_not post.publishable?(now)
-      assert_not post.schedulable?(now)
-      assert_raises(Post::TransitionError) { post.publish!(now) }
-      assert_raises(Post::TransitionError) { post.schedule!(now) }
-    end
+    now = Time.zone.parse("2026-11-20 10:00")
+    assert post.date_expired?(now)
+    assert post.publishable?(now)
+    assert_not post.schedulable?(now)
+    assert_raises(Post::TransitionError) { post.schedule!(now) }
 
-    post.update!(publish_at: nil)
-    assert post.publishable?
-    assert_not post.date_expired?
+    post.publish!(now)
+    assert_equal now, post.reload.publish_at, "la data diventa quella vera di uscita"
   end
 
-  test "una bozza con l'ora nel futuro si programma, non si pubblica" do
+  test "una bozza con la data futura si programma, oppure si pubblica subito" do
     now = Time.zone.parse("2026-11-12 20:29")
     post = posts(:mensa)
-
     assert post.schedulable?(now)
-    assert_raises(Post::TransitionError) { post.publish!(now) }
+    assert post.publishable?(now)
 
     post.schedule!(now)
     assert post.reload.scheduled?
+    assert_not post.publishable?(now), "un post programmato non si pubblica più dalla bozza"
   end
 
-  test "un post pubblicato si spubblica e torna bozza; gli altri no" do
+  test "un post pubblicato si spubblica e torna in bozza; gli altri no" do
     posts(:open_day).unpublish!
     assert posts(:open_day).reload.draft?
 

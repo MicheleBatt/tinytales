@@ -58,10 +58,12 @@ vanno scelti di nuovo.
 
 - Ogni post **nasce bozza**. Data e ora di pubblicazione si possono lasciare vuote finché è una bozza;
   programmati e pubblicati ce l'hanno sempre. Lo stato non si cambia dal form ma dai pulsanti della pagina del post:
-  - bozza **senza data** → **Pubblica** → pubblicato subito (la data diventa quella di uscita);
-  - bozza con la data **nel futuro** → **Programma** → programmato;
-  - bozza con la data **passata** → nessuno dei due: si cancella la data (per pubblicarlo subito)
-    o se ne imposta una futura (per programmarlo);
+  - una bozza ha sempre **Pubblica Ora** e **Programma**, qualunque data abbia;
+  - **Pubblica Ora** → pubblicato subito; la data diventa quella vera di uscita;
+  - **Programma** → la finestra di conferma propone la data del post se è futura (altrimenti va scelta),
+    da 10 minuti a 30 giorni da adesso; programmato a quella data, che diventa la data del post
+    (salvata solo se Facebook accetta);
+  - il bottone blu è Programma se la bozza ha già una data futura, altrimenti Pubblica Ora;
   - post pubblicato → **Spubblica** → di nuovo bozza.
 - Il server ricontrolla l'ora al momento del clic (`Post#publish!`, `#schedule!`, `#unpublish!`).
 - Un post si può sempre **modificare** ed **eliminare** (con conferma), in qualunque stato.
@@ -72,7 +74,7 @@ Ogni azione sul post vale anche sulle sue pagine social (oggi solo Facebook, con
 
 | Nell'app | Su Facebook |
 |---|---|
-| **Pubblica** | il post esce subito |
+| **Pubblica** | il post viene pubblicato subito |
 | **Programma** | il post viene programmato (Facebook accetta da 10 minuti a 30 giorni da adesso) |
 | **Modifica** di un post programmato | viene ricreato con testo, file e ora nuovi, poi il vecchio viene tolto |
 | **Modifica** di un post pubblicato | viene aggiornato il testo; foto e video Facebook non li lascia cambiare (l'app avvisa) |
