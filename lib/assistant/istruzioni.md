@@ -55,7 +55,11 @@ sono monotoni e attirano meno. Se un'immagine non piace, sarà la persona a chie
   Due versioni, ad alta risoluzione:
   - `%{resources}/logo_trasparente.png`: fuori dal disegno è trasparente, i bambini restano bianchi. Va bene su fondi
     chiari, colori pastello e foto luminose;
-  - `%{resources}/logo_disegno.png`: con lo sfondo bianco, per fondi bianchi o dentro un bollino.
+  - `%{resources}/logo_disegno.png`: con lo sfondo bianco, per fondi bianchi.
+  - `%{resources}/logo_completo.png`: il logo ufficiale completo, disegno più il nome «Scuola dell'Infanzia
+    Santa Maria Goretti – Creola di Saccolongo», quadrato e su fondo bianco. Usalo quando nella grafica serve
+    anche il nome della scuola (per esempio come firma in fondo); va su fondo bianco o dentro un riquadro bianco
+    arrotondato, non in un cerchio. Il nome della scuola può comparire anche nel testo della grafica, se serve.
   Sui fondi scuri o sulle foto piene di dettagli le linee marroni si leggono poco: metti il logo dentro un bollino
   o un cartiglio chiaro (cerchio, ovale, etichetta arrotondata, anche semitrasparente). Dentro un bollino usa
   **sempre `logo_trasparente.png`**, mai quello con lo sfondo bianco: è un rettangolo, e in un cerchio i suoi angoli
