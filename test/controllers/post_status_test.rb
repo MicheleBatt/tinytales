@@ -102,6 +102,30 @@ class PostStatusTest < ActionDispatch::IntegrationTest
     assert_not publications(:open_day_facebook).reload.on_social?
   end
 
+  test "su un programmato Spubblica annulla la programmazione e lo riporta bozza con la sua data" do
+    get post_path(posts(:promemoria))
+    form = "form[action='#{unpublish_post_path(posts(:promemoria))}']"
+    assert_select "#{form} button", "Spubblica"
+    assert_select "#{form}[data-confirm-title='Annullare la programmazione?'][data-confirm-tone=pericolo]"
+    assert_select "#{form}[data-turbo-confirm*='non uscirà sulla pagina Facebook']"
+    assert_select "#{form}[data-busy-message='Annullamento della programmazione sulla pagina Facebook in corso…']"
+
+    date = posts(:promemoria).publish_at
+    patch unpublish_post_path(posts(:promemoria))
+    assert posts(:promemoria).reload.draft?
+    assert_equal date, posts(:promemoria).publish_at
+    assert_equal [ "1234_888" ], @facebook.paths(:delete)
+    assert_not publications(:promemoria_facebook).reload.on_social?
+    follow_redirect!
+    assert_match "Programmazione annullata", flash[:notice]
+  end
+
+  test "se Facebook non riesce ad annullare la programmazione, il post resta programmato" do
+    @facebook.fail_on(:delete, /1234_888/, "Errore temporaneo")
+    patch unpublish_post_path(posts(:promemoria))
+    assert posts(:promemoria).reload.scheduled?
+  end
+
   test "se Facebook non riesce a togliere il post, resta pubblicato" do
     @facebook.fail_on(:delete, /1234_999/, "Errore temporaneo")
     patch unpublish_post_path(posts(:open_day))

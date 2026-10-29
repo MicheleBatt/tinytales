@@ -86,7 +86,11 @@ class PostsController < ApplicationController
   end
 
   def unpublish
-    sync(notice: "Post tolto dai social: nell'app è di nuovo una bozza.", failure: "Rimozione dai social non riuscita") { |s| s.unpublish! }
+    if @post.scheduled?
+      sync(notice: "Programmazione annullata: nell'app il post è di nuovo una bozza.", failure: "Annullamento della programmazione non riuscito") { |s| s.unpublish! }
+    else
+      sync(notice: "Post tolto dai social: nell'app è di nuovo una bozza.", failure: "Rimozione dai social non riuscita") { |s| s.unpublish! }
+    end
   end
 
   # Riprova a riportare sui social l'ultima versione del post, dopo un errore.

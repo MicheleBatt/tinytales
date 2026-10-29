@@ -37,6 +37,13 @@
                                   confirm_title: "Togliere il post dai social?", confirm_button: "Spubblica", confirm_tone: "pericolo",
                                   busy_message: "Rimozione del post #{from_pages} in corso…" } } %>
     <span class="aiuto">Il post sparisce dai social e torna in bozza.</span>
+  <% elsif post.scheduled? %>
+    <%# Su un programmato, Spubblica annulla la programmazione: il post torna bozza e tiene la sua data. %>
+    <%= button_to "Spubblica", unpublish_post_path(post), method: :patch, params: back, class: "bottone bottone-secondario",
+                  form: { data: { turbo_confirm: "La programmazione del post «#{post.title}» viene annullata: non uscirà #{on_pages}. Nell'app resterà come bozza, con la sua data.",
+                                  confirm_title: "Annullare la programmazione?", confirm_button: "Spubblica", confirm_tone: "pericolo",
+                                  busy_message: "Annullamento della programmazione #{on_pages} in corso…" } } %>
+    <span class="aiuto">Annulla la programmazione: il post non esce e torna in bozza.</span>
   <% end %>
 
   <span class="azioni-separatore" aria-hidden="true"></span>

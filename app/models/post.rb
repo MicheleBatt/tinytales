@@ -83,8 +83,9 @@ class Post < ApplicationRecord
     update!(status: :scheduled)
   end
 
+  # Pubblicato o programmato: torna bozza. Un programmato tiene la sua data, da riproporre con «Programma».
   def unpublish!
-    raise TransitionError, "Si può spubblicare solo un post pubblicato." unless published?
+    raise TransitionError, "Si può spubblicare solo un post pubblicato o programmato." unless published? || scheduled?
 
     update!(status: :draft)
   end

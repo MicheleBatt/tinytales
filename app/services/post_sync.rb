@@ -4,6 +4,7 @@
 #   se una pagina rifiuta, quelle già fatte vengono annullate e il post resta bozza.
 # - update! riporta sui social le modifiche di un post programmato o pubblicato.
 # - unpublish! e destroy! tolgono il post dai social; il primo lo tiene come bozza, il secondo lo cancella.
+#   Su un programmato, unpublish! annulla la programmazione.
 #
 # Ogni metodo restituisce gli avvisi da mostrare (array di stringhe) oppure solleva PostSync::Error.
 class PostSync
@@ -51,7 +52,7 @@ class PostSync
   end
 
   def unpublish!
-    ensure_transition!(post.published?, "Si può spubblicare solo un post pubblicato.")
+    ensure_transition!(post.published? || post.scheduled?, "Si può spubblicare solo un post pubblicato o programmato.")
     warnings = remove_everywhere
     post.unpublish!
     warnings

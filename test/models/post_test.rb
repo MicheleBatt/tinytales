@@ -49,11 +49,15 @@ class PostTest < ActiveSupport::TestCase
     assert_not post.publishable?(now), "un post programmato non si pubblica più dalla bozza"
   end
 
-  test "un post pubblicato si spubblica e torna in bozza; gli altri no" do
+  test "un post pubblicato o programmato si spubblica e torna in bozza; una bozza no" do
     posts(:open_day).unpublish!
     assert posts(:open_day).reload.draft?
 
-    assert_raises(Post::TransitionError) { posts(:promemoria).unpublish! }
+    date = posts(:promemoria).publish_at
+    posts(:promemoria).unpublish!
+    assert posts(:promemoria).reload.draft?
+    assert_equal date, posts(:promemoria).publish_at, "il programmato tiene la sua data"
+
     assert_raises(Post::TransitionError) { posts(:mensa).unpublish! }
   end
 
