@@ -10,7 +10,8 @@ require "open3"
 # Può leggere solo sito, app e memoria (non i segreti dell'app: chiavi e credenziali);
 # può scrivere solo nella cartella di lavoro della chat;
 # da Bash può usare solo ImageMagick (con regole che gli permettono di leggere le stesse cartelle
-# e di scrivere solo nella cartella di lavoro) e i comandi di sola lettura `bin/assistant`.
+# e di scrivere solo nella cartella di lavoro) e i comandi `bin/assistant`: quelli di sola lettura sui post
+# e quelli per montare i video, che usano ffmpeg al posto suo con controlli propri (Assistant::Video).
 class AssistantRunner
   CLAUDE = ENV.fetch("CLAUDE_BIN", File.expand_path("~/.local/bin/claude"))
   SITE_ROOT = Pathname(ENV.fetch("ASSISTANT_SITE_ROOT", "/home/michele/Progetti/scuola-infanzia-creola"))
@@ -275,6 +276,8 @@ class AssistantRunner
       case command
       when /\A\S*bin\/assistant posts\z/ then "Guardo l'elenco dei post"
       when /\A\S*bin\/assistant post (\d+)\z/ then "Leggo il post #{$1}"
+      when /\A\S*bin\/assistant video (\S+)\z/ then "Monto il video (#{File.basename($1)})"
+      when /\A\S*bin\/assistant fotogramm[ia] (\S+)/ then "Guardo il video #{File.basename($1)}"
       when /\A(convert|magick|montage|composite)\b/
         output = command.scan(/\S+\.(?:jpe?g|png|webp|gif)\b/i).last
         output ? "Preparo l'immagine #{File.basename(output)}" : "Preparo un'immagine"

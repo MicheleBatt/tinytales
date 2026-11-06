@@ -14,7 +14,8 @@ class AssistantConversation < ApplicationRecord
     "testo" => %w[.txt .md .csv],
     "pdf" => %w[.pdf],
     "immagine" => %w[.jpg .jpeg .png .gif .webp .heic .heif],
-    "video" => %w[.mp4 .mov .m4v .webm]
+    "video" => %w[.mp4 .mov .m4v .webm],
+    "audio" => %w[.mp3 .m4a .wav .ogg] # musica per i video montati da Claude
   }.freeze
   MAX_UPLOAD_SIZE = 100.megabytes
   MAX_UPLOADS = 10
@@ -123,7 +124,7 @@ class AssistantConversation < ApplicationRecord
     kind = UPLOAD_KINDS.find { |_, extensions| extensions.include?(extension) }&.first
     unless kind
       raise UploadError, "«#{original}»: tipo di file non accettato. Si possono allegare testi (.txt, .md, .csv), " \
-                         "PDF, immagini e video. Per un documento Word, copiane il testo o salvalo in PDF."
+                         "PDF, immagini, video e audio. Per un documento Word, copiane il testo o salvalo in PDF."
     end
     raise UploadError, "«#{original}» è troppo grande: il massimo è 100 MB." if upload.size > MAX_UPLOAD_SIZE
 

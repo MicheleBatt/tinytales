@@ -143,6 +143,8 @@ class AssistantRunnerTest < ActiveSupport::TestCase
     assert_equal "Leggo il post 16", say.("#{AssistantRunner::ASSISTANT_BIN} post 16")
     assert_equal "Guardo l'elenco dei post", say.("#{AssistantRunner::ASSISTANT_BIN} posts")
     assert_equal "Controllo un'immagine", say.("identify /tmp/x.png")
+    assert_equal "Monto il video (_video-festa.json)", say.("#{AssistantRunner::ASSISTANT_BIN} video /x/_video-festa.json")
+    assert_equal "Guardo il video festa.mp4", say.("#{AssistantRunner::ASSISTANT_BIN} fotogrammi /x/festa.mp4 6")
     assert_equal "Eseguo: ls", say.("ls")
   end
 

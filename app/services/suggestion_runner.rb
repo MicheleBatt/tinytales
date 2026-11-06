@@ -20,11 +20,11 @@ class SuggestionRunner < AssistantRunner
                               max_proposals: PostSuggestionBatch::MAX_PROPOSALS) + "\n\n" + graphics_rules
   end
 
-  # Le regole sulle grafiche sono quelle della chat: le prendiamo da lì, così restano uguali.
+  # Le regole su grafiche e video sono quelle della chat: le prendiamo da lì, così restano uguali.
   def graphics_rules
     text = format(AssistantRunner::INSTRUCTIONS.read, app_root: Rails.root, site_root: SITE_ROOT,
                   outbox: @conversation.outbox, resources: RESOURCES, assistant_bin: ASSISTANT_BIN)
-    text[/^## Grafiche.*?(?=^## )/m].to_s
+    text[/^## Grafiche.*?(?=^## )/m].to_s + text[/^## Video.*?(?=^## )/m].to_s
   end
 
   def prompt(_message = nil, _attachments = [])

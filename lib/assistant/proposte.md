@@ -49,6 +49,8 @@ Più la proposta è completa, meno lavoro resta alla persona. Ma non è un vinco
 - grafiche nuove create da te nella cartella di lavoro `%{outbox}`, secondo le regole qui sotto.
 
 Le grafiche richiedono tempo: falle quando aggiungono davvero qualcosa, non per forza per ogni post.
+Lo stesso vale per i **video** (sezione «Video» qui sotto): al massimo uno o due per richiesta, per i post che ne
+guadagnano di più (un evento importante, un invito); un post con un video non ha foto.
 
 ## Come consegnare le proposte
 

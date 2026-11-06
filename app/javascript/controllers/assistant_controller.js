@@ -189,7 +189,7 @@ export default class extends Controller {
     }
     this.renderPending()
     if (rejected.length) {
-      this.statusTarget.textContent = `Non allegati: ${rejected.join(", ")}. Si possono allegare testi, PDF, immagini e video.`
+      this.statusTarget.textContent = `Non allegati: ${rejected.join(", ")}. Si possono allegare testi, PDF, immagini, video e audio.`
       clearTimeout(this.statusTimer)
       this.statusTimer = setTimeout(() => { this.statusTarget.textContent = "" }, 6000)
     }
@@ -219,7 +219,7 @@ export default class extends Controller {
     const icon = document.createElement("span")
     icon.className = "allegato-icona"
     icon.setAttribute("aria-hidden", "true")
-    icon.textContent = /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(name) ? "🖼️" : /\.(mp4|mov|m4v|webm)$/i.test(name) ? "🎬" : "📄"
+    icon.textContent = /\.(jpe?g|png|gif|webp|heic|heif)$/i.test(name) ? "🖼️" : /\.(mp4|mov|m4v|webm)$/i.test(name) ? "🎬" : /\.(mp3|m4a|wav|ogg)$/i.test(name) ? "🎵" : "📄"
     return icon
   }
 

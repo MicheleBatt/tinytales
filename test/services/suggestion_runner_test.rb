@@ -22,6 +22,7 @@ class SuggestionRunnerTest < ActiveSupport::TestCase
     assert_includes prompt, "#{@batch.outbox}/proposta-01.json"
     assert_includes prompt, @batch.outbox.to_s
     assert_includes prompt, "## Grafiche: varietà e fantasia"
+    assert_includes prompt, "## Video", "anche le regole sui video della chat"
     assert_not_includes prompt, "## Come proporre modifiche al post"
   end
 

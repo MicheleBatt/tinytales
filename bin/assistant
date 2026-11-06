@@ -1,12 +1,39 @@
 #!/usr/bin/env ruby
-# Comandi di sola lettura per l'assistente della chat, avviabili da qualsiasi cartella:
-#   bin/assistant posts       elenco dei post
-#   bin/assistant post 12     un post completo, con i percorsi dei file
-command, id = ARGV
-abort "Uso: bin/assistant posts | bin/assistant post ID" unless %w[posts post].include?(command)
+# Comandi per l'assistente della chat, avviabili da qualsiasi cartella:
+#   bin/assistant posts                       elenco dei post (sola lettura)
+#   bin/assistant post 12                     un post completo, con i percorsi dei file (sola lettura)
+#   bin/assistant video RICETTA.json          monta un video dalla ricetta (vedi lib/assistant/video.rb)
+#   bin/assistant fotogrammi VIDEO.mp4 [N]    un foglio con N fotogrammi del video (9 se non indicato)
+#   bin/assistant fotogramma VIDEO.mp4 SEC    un fotogramma a piena risoluzione
+# I file della ricetta e i video devono stare nella cartella di lavoro della chat, dove finiscono anche i risultati.
+USAGE = "Uso: bin/assistant posts | post ID | video RICETTA.json | fotogrammi VIDEO.mp4 [N] | fotogramma VIDEO.mp4 SECONDI".freeze
+command, *args = ARGV
 
-Dir.chdir(File.expand_path("..", __dir__))
-ENV.delete("DATABASE")
-args = [ "bin/rails", "assistant:#{command}" ]
-args << "ID=#{id}" if command == "post"
-exec(*args)
+case command
+when "posts", "post"
+  Dir.chdir(File.expand_path("..", __dir__))
+  ENV.delete("DATABASE")
+  rails = [ "bin/rails", "assistant:#{command}" ]
+  rails << "ID=#{args.first}" if command == "post"
+  exec(*rails)
+when "video", "fotogrammi", "fotogramma"
+  require_relative "../lib/assistant/video"
+  begin
+    abort USAGE if args.empty?
+    puts case command
+         when "video"
+           abort USAGE unless args.size == 1
+           Assistant::Video.new(args.first).then { |video| video.render! && video.summary }
+         when "fotogrammi"
+           abort USAGE unless args.size.between?(1, 2)
+           Assistant::Video.contact_sheet(args[0], args[1] || 9)
+         else
+           abort USAGE unless args.size == 2
+           Assistant::Video.frame(args[0], args[1])
+         end
+  rescue Assistant::Video::Error => e
+    abort "Errore: #{e.message}"
+  end
+else
+  abort USAGE
+end
