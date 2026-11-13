@@ -140,4 +140,30 @@ class Assistant::VideoTest < ActiveSupport::TestCase
     error = assert_raises(Assistant::Video::Error) { Assistant::Video.contact_sheet(LOGO) }
     assert_match "cartella di lavoro", error.message
   end
+
+  test "musica dalla musicoteca, per numero: il file lo trova l'app" do
+    audio = Rails.root.join("test/fixtures/files/brano.mp3").to_s
+    Assistant::Video.music_resolver = ->(id) { { path: audio, ext: ".mp3", title: "Giornata felice" } if id == 7 }
+
+    v = video("musica" => { "brano" => 7, "volume" => 0.5 })
+    graph = v.command[v.command.index("-filter_complex") + 1]
+    assert_includes v.command, "file:#{audio}"
+    assert_match "loudnorm", graph
+    assert_match "volume=0.5", graph
+
+    refused({ "uscita" => "x.mp4", "musica" => { "brano" => 8 }, "scene" => [ scene ] }, "non c'è o è disattivato")
+    refused({ "uscita" => "x.mp4", "musica" => { "brano" => "7; rm" }, "scene" => [ scene ] }, "numero di un brano")
+    refused({ "uscita" => "x.mp4", "musica" => { "brano" => 7, "file" => audio }, "scene" => [ scene ] }, "oppure")
+  ensure
+    Assistant::Video.music_resolver = nil
+  end
+
+  test "senza l'app (e il suo database) la musicoteca non si usa" do
+    refused({ "uscita" => "x.mp4", "musica" => { "brano" => 1 }, "scene" => [ scene ] }, "solo dall'app")
+  end
+
+  test "una traccia come file solo se allegata nella chat" do
+    refused({ "uscita" => "x.mp4", "musica" => { "file" => Rails.root.join("test/fixtures/files/brano.mp3").to_s },
+              "scene" => [ scene ] }, /solo file del sito|solo tracce allegate/)
+  end
 end

@@ -27,6 +27,42 @@ namespace :assistant do
     abort "Nessun post con id #{ENV['ID']}."
   end
 
+  desc "I brani della musicoteca utilizzabili, con la loro scheda (per l'assistente)"
+  task musica: :environment do
+    puts MusicTrack.assistant_listing
+  end
+
+  desc "Monta un video dalla ricetta di Claude: bin/rails assistant:video RICETTA=/percorso/_video.json"
+  task video: :environment do
+    # Brani della musicoteca per numero e allegati dei post: li trova l'app.
+    VideoSetup.apply!
+    video = Assistant::Video.new(ENV.fetch("RICETTA"))
+    video.render!
+    puts video.summary
+  rescue KeyError
+    abort "Indica la ricetta: bin/rails assistant:video RICETTA=/percorso/_video.json"
+  rescue Assistant::Video::Error => e
+    abort "Errore: #{e.message}"
+  end
+
+  desc "Foto e video della pagina Facebook della scuola (per l'assistente): elenco, anteprime o scaricamento"
+  task facebook: :environment do
+    media = FacebookMedia.new
+    ids = ENV.fetch("IDS", "").split(",")
+    case ENV["AZIONE"]
+    when nil, "" then puts media.listing
+    when "anteprime" then puts media.previews!(ENV.fetch("CARTELLA"), ids)
+    when "scarica"
+      saved = media.download!(ENV.fetch("CARTELLA"), ids)
+      puts "Scaricati nella cartella di lavoro:", *saved.map { |path| "- #{path}" }
+    else abort "AZIONE sconosciuta: #{ENV['AZIONE']}"
+    end
+  rescue KeyError
+    abort "Indica la cartella di lavoro: CARTELLA=/percorso"
+  rescue FacebookMedia::Error => e
+    abort "Errore: #{e.message}"
+  end
+
   desc "Una volta sola: porta in Active Storage i file delle chat ancora nelle cartelle tmp/assistant/<token>"
   task import_files: :environment do
     AssistantConversation.find_each do |conversation|

@@ -1,0 +1,6 @@
+<% content_for :title, "Modifica: #{@track.title_was || @track.title} · TinyTales" %>
+
+<nav class="briciole"><%= link_to "Musicoteca", music_tracks_path %> › <%= @track.title_was || @track.title %></nav>
+<h1 class="pagina-titolo">Modifica il brano</h1>
+
+<%= render "form", track: @track %>

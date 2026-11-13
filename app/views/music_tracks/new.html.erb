@@ -1,0 +1,6 @@
+<% content_for :title, "Nuovo brano · TinyTales" %>
+
+<nav class="briciole"><%= link_to "Musicoteca", music_tracks_path %> › Nuovo brano</nav>
+<h1 class="pagina-titolo">Nuovo brano</h1>
+
+<%= render "form", track: @track %>

@@ -1,0 +1,134 @@
+<%= form_with model: track, class: "modulo",
+              data: { controller: "music-autofill", music_autofill_url_value: autofill_music_tracks_path,
+                      music_autofill_track_id_value: track.id } do |f| %>
+  <% if track.errors.any? %>
+    <div class="avviso avviso-ritardo" role="alert">
+      <strong>Il brano non è stato salvato.</strong> Correggi questi punti:
+      <ul><% track.errors.full_messages.each do |message| %><li><%= message %></li><% end %></ul>
+    </div>
+  <% end %>
+  <% if @audio_discarded %>
+    <p class="avviso avviso-info">Il file audio scelto non è stato caricato: selezionalo di nuovo prima di salvare.</p>
+  <% end %>
+
+  <section class="riquadro riquadro-brano-fonte">
+    <h2>Il brano</h2>
+    <% if track.audio.attached? && track.audio.persisted? %>
+      <div class="brano-attuale">
+        <%= audio_tag rails_blob_path(track.audio, disposition: "inline"), controls: true, preload: "metadata" %>
+        <span class="aiuto"><%= track.audio.filename %> · <%= track.duration_label %></span>
+      </div>
+    <% end %>
+    <div class="campo">
+      <%= f.label :audio, track.audio.attached? && track.audio.persisted? ? "Sostituisci il file" : "File audio" %>
+      <%= f.file_field :audio, accept: MusicTrack::FORMATS.keys.join(","), "aria-invalid": track.errors.include?(:audio),
+                       data: { music_autofill_target: "file" } %>
+      <%= field_error(track, :audio) %>
+      <span class="aiuto">MP3, M4A, WAV o OGG, fino a 30 MB. La durata la calcola l'app.</span>
+    </div>
+    <div class="campo">
+      <%= f.label :source_url, "Link alla pagina del brano" %>
+      <%= f.url_field :source_url, required: true, placeholder: "https://pixabay.com/music/…",
+                      "aria-invalid": track.errors.include?(:source_url), data: { music_autofill_target: "url" } %>
+      <%= field_error(track, :source_url) %>
+      <span class="aiuto">Serve a dimostrare da dove viene il brano, se mai qualcuno lo contestasse.</span>
+    </div>
+    <div class="campo">
+      <%= f.label :source_tags, "Tag della pagina (facoltativi)" %>
+      <%= f.text_field :source_tags, placeholder: "es. kids, happy, ukulele, children", data: { music_autofill_target: "tags" } %>
+      <span class="aiuto">Copiali dalla pagina del brano su Pixabay: aiutano molto Claude a capire atmosfera e strumenti.</span>
+    </div>
+
+    <div class="compila-claude">
+      <button type="button" class="bottone bottone-claude" data-music-autofill-target="button" data-action="music-autofill#fill">
+        <span class="stellina" aria-hidden="true">✦</span> <span class="etichetta">Compila con Claude</span>
+      </button>
+      <span class="aiuto compila-stato" data-music-autofill-target="status" role="status">
+        Scegli il file e incolla il link: Claude compila il resto della scheda, poi tu controlli e salvi.
+      </span>
+    </div>
+    <div class="avviso avviso-ritardo" data-music-autofill-target="warning" hidden></div>
+  </section>
+
+  <section class="riquadro">
+    <h2>Da dove viene</h2>
+    <div class="riga-campi riga-campi-brano">
+      <div class="campo">
+        <%= f.label :title, "Titolo" %>
+        <%= f.text_field :title, required: true, placeholder: "es. Happy Day", "aria-invalid": track.errors.include?(:title) %>
+        <%= field_error(track, :title) %>
+      </div>
+      <div class="campo">
+        <%= f.label :author, "Autore" %>
+        <%= f.text_field :author, placeholder: "Facoltativo" %>
+      </div>
+      <div class="campo">
+        <%= f.label :license, "Licenza" %>
+        <%= f.select :license, MusicTrack::LICENSES, { include_blank: "Scegli…" }, "aria-invalid": track.errors.include?(:license) %>
+        <%= field_error(track, :license) %>
+      </div>
+    </div>
+  </section>
+
+  <section class="riquadro">
+    <h2>Scheda per Claude</h2>
+    <p class="aiuto">Claude non può ascoltare la musica: sceglie il brano solo da queste informazioni.</p>
+
+    <fieldset class="campo">
+      <legend>Atmosfera (una o più)</legend>
+      <div class="scelte">
+        <% MusicTrack::MOODS.each do |mood| %>
+          <label class="scelta">
+            <%= check_box_tag "music_track[moods][]", mood, track.moods.include?(mood), id: "music_track_moods_#{mood}" %>
+            <span><%= mood %></span>
+          </label>
+        <% end %>
+        <%= hidden_field_tag "music_track[moods][]", "", id: nil %>
+      </div>
+      <%= field_error(track, :moods) %>
+    </fieldset>
+
+    <div class="riga-campi riga-campi-brano">
+      <fieldset class="campo">
+        <legend>Ritmo</legend>
+        <div class="scelte">
+          <% MusicTrack::TEMPOS.each do |tempo| %>
+            <label class="scelta">
+              <%= f.radio_button :tempo, tempo %>
+              <span><%= tempo %></span>
+            </label>
+          <% end %>
+        </div>
+        <%= field_error(track, :tempo) %>
+      </fieldset>
+      <div class="campo">
+        <%= f.label :instruments, "Strumenti" %>
+        <%= f.text_field :instruments, placeholder: "es. ukulele, battimani, fischiettio" %>
+      </div>
+      <fieldset class="campo">
+        <legend>Voce</legend>
+        <label class="scelta"><%= f.check_box :vocals %><span>Ha una parte cantata</span></label>
+      </fieldset>
+    </div>
+
+    <div class="campo">
+      <%= f.label :suitable_for, "Adatto a" %>
+      <%= f.text_field :suitable_for, placeholder: "es. feste, Open Day, uscite in giardino" %>
+    </div>
+    <div class="campo">
+      <%= f.label :notes, "Note" %>
+      <%= f.text_area :notes, rows: 3, class: "testo-modificabile",
+                      placeholder: "es. parte piano e cresce dopo 20 secondi; il ritornello arriva a 0:45" %>
+      <span class="aiuto">Tutto ciò che aiuta a usarlo bene: come comincia, dove cambia, cosa evitare.</span>
+    </div>
+  </section>
+
+  <section class="riquadro">
+    <label class="scelta"><%= f.check_box :enabled %><span>Attivo: Claude può usarlo</span></label>
+  </section>
+
+  <div class="barra-azioni">
+    <%= f.submit class: "bottone bottone-principale" %>
+    <%= link_to "Annulla", music_tracks_path, class: "bottone bottone-secondario" %>
+  </div>
+<% end %>

@@ -104,7 +104,7 @@ function typeInto(element, text, onDone = () => {}) {
 
 export default class extends Controller {
   static targets = ["panel", "opener", "messages", "intro", "stored", "input", "send", "stop", "status",
-                    "pending", "fileInput", "attach"]
+                    "pending", "fileInput", "attach", "internet"]
   static values = { url: String, token: String, postId: String, fileUrl: String }
 
   connect() {
@@ -147,6 +147,24 @@ export default class extends Controller {
   suggest(event) {
     this.inputTarget.value = event.currentTarget.textContent.trim()
     this.send()
+  }
+
+  // ---------- internet ----------
+
+  // Acceso vale solo per il prossimo messaggio: dopo l'invio si spegne da solo.
+  toggleInternet() {
+    this.setInternet(!this.internetOn())
+    this.inputTarget.focus()
+  }
+
+  internetOn() {
+    return this.hasInternetTarget && this.internetTarget.getAttribute("aria-pressed") === "true"
+  }
+
+  setInternet(on) {
+    if (!this.hasInternetTarget) return
+    this.internetTarget.setAttribute("aria-pressed", on ? "true" : "false")
+    this.inputTarget.placeholder = on ? "Internet acceso per questo messaggio: cosa cerco?" : this.idlePlaceholder
   }
 
   // ---------- allegati ----------
@@ -268,12 +286,15 @@ export default class extends Controller {
 
     this.introTarget.hidden = true
     const sent = this.addMessage("user", text)
+    const internet = this.internetOn()
+    if (internet) sent.prepend(Object.assign(document.createElement("span"), { className: "msg-internet", textContent: "🌐 con internet" }))
     if (files.length) {
       sent.append(this.attachmentList(files.map((f) => ({ name: f.name, url: URL.createObjectURL(f), local: URL.createObjectURL(f) }))))
     }
     this.inputTarget.value = ""
     this.pendingFiles = []
     this.renderPending()
+    this.setInternet(false)
     const reply = this.addMessage("assistant", "")
     const body = reply.querySelector(".msg-corpo")
     const activity = document.createElement("ul")
@@ -301,7 +322,7 @@ export default class extends Controller {
       const response = await fetch(this.urlValue, {
         method: "POST",
         headers: { "X-CSRF-Token": document.querySelector("meta[name='csrf-token']")?.content, Accept: "application/x-ndjson" },
-        body: this.payload(text, files),
+        body: this.payload(text, files, internet),
         signal: this.controller.signal
       })
       if (!response.ok || !response.body) {
@@ -366,9 +387,10 @@ export default class extends Controller {
     ;(last && last.tagName !== "DIV" ? last : container).append(caret)
   }
 
-  payload(text, files = []) {
+  payload(text, files = [], internet = false) {
     const data = new FormData()
     data.append("message", text)
+    if (internet) data.append("internet", "1")
     files.forEach((file) => data.append("files[]", file, file.name))
     data.append("token", this.tokenValue)
     if (this.postIdValue) data.append("post_id", this.postIdValue)
@@ -407,6 +429,7 @@ export default class extends Controller {
     this.sendTarget.hidden = busy
     this.stopTarget.hidden = !busy
     this.attachTarget.disabled = busy
+    if (this.hasInternetTarget) this.internetTarget.disabled = busy
     this.inputTarget.disabled = busy
     this.inputTarget.placeholder = busy ? "Attendi che Claude finisca…" : this.idlePlaceholder
     this.statusTarget.textContent = ""

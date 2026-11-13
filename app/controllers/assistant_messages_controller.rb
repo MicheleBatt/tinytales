@@ -52,7 +52,8 @@ class AssistantMessagesController < ApplicationController
     response.headers["Last-Modified"] = Time.now.httpdate # evita che Rack::ETag trattenga lo stream
 
     reply = +""
-    runner = runner_class.new(conversation, form_state: form_state)
+    # Internet solo per questo messaggio, e solo se la persona l'ha acceso.
+    runner = runner_class.new(conversation, form_state: form_state, internet: params[:internet] == "1")
     runner.run(message, attachments:) do |event|
       reply << event[:text] if event[:type] == "delta"
       response.stream.write("#{event.to_json}\n")

@@ -1,0 +1,109 @@
+<% content_for :title, "Musicoteca · TinyTales" %>
+
+<div class="titolo-con-azione pagina-testa">
+  <div>
+    <h1 class="pagina-titolo">Musicoteca</h1>
+    <p class="pagina-sotto">I brani che Claude può scegliere come sottofondo dei video</p>
+  </div>
+  <div class="azioni-testa">
+    <%= link_to "Nuovo brano", new_music_track_path, class: "bottone bottone-principale" %>
+  </div>
+</div>
+
+<details class="riquadro guida-musica" <%= "open" if @library_empty %>>
+  <summary>Come aggiungere un brano</summary>
+  <ol>
+    <li>Cerca su <a href="https://pixabay.com/music/" target="_blank" rel="noopener">pixabay.com/music ↗</a>
+      (se te lo chiede, accedi con un account gratuito), per esempio «happy kids ukulele», «christmas bells», «music box».</li>
+    <li>Ascoltalo e tienilo solo se è allegro, vivace, dolce o rilassante: niente musiche aggressive, cupe, horror,
+      rock, metal, da discoteca o da Halloween. Meglio se strumentale. Scartalo se la sua pagina segnala limiti d'uso.</li>
+    <li>Scarica l'MP3 e copia il link della pagina del brano.</li>
+    <li>Qui premi «Nuovo brano», carica il file e compila la scheda: è quello che Claude legge per scegliere,
+      perché la musica non può ascoltarla. Atmosfera, ritmo e «adatto a» sono le parti più importanti.</li>
+  </ol>
+  <p class="aiuto">Quando nella chat manca il brano adatto a un video, Claude te lo dice e suggerisce cosa cercare.
+    Un brano disattivato resta qui ma Claude non lo usa.</p>
+</details>
+
+<% unless @library_empty %>
+  <%= search_form_for @q, url: music_tracks_path, html: { class: "filtri", data: { turbo_action: "advance" } } do |f| %>
+    <div class="filtro filtro-largo">
+      <%= f.label :title_or_author_or_instruments_or_suitable_for_or_notes_or_source_tags_cont, "Cerca" %>
+      <%= f.search_field :title_or_author_or_instruments_or_suitable_for_or_notes_or_source_tags_cont,
+                         placeholder: "Titolo, autore, strumenti, note, tag…" %>
+    </div>
+    <div class="filtro">
+      <%= f.label :with_mood, "Atmosfera" %>
+      <%= f.select :with_mood, MusicTrack::MOODS, include_blank: "Tutte" %>
+    </div>
+    <div class="filtro">
+      <%= f.label :tempo_eq, "Ritmo" %>
+      <%= f.select :tempo_eq, MusicTrack::TEMPOS, include_blank: "Tutti" %>
+    </div>
+    <div class="filtro">
+      <%= f.label :voice, "Voce" %>
+      <%= f.select :voice, [ [ "Strumentali", "strumentali" ], [ "Con voce", "con-voce" ] ], include_blank: "Tutti" %>
+    </div>
+    <div class="filtro">
+      <%= f.label :state, "Stato" %>
+      <%= f.select :state, [ [ "Attivi", "attivi" ], [ "Disattivati", "disattivati" ] ], include_blank: "Tutti" %>
+    </div>
+    <div class="filtro">
+      <%= f.label :s, "Ordine" %>
+      <%= f.select :s, MusicTracksController::SORTS.invert, selected: params.dig(:q, :s) || "title asc" %>
+    </div>
+    <div class="filtri-azioni">
+      <%= f.submit "Filtra", class: "bottone", name: nil %>
+      <%= link_to "Azzera", music_tracks_path, class: "bottone bottone-secondario" %>
+    </div>
+  <% end %>
+
+  <div class="barra-elenco">
+    <p class="risultati">
+      <%= pluralize(@total, "brano", plural: "brani") %><% if params[:q].present? %> trovati con questi filtri<% end %>
+    </p>
+  </div>
+<% end %>
+
+<% if @library_empty %>
+  <p class="vuoto riquadro">La musicoteca è vuota: per ora i video di Claude si fanno senza musica.</p>
+<% elsif @tracks.empty? %>
+  <p class="vuoto">Nessun brano corrisponde ai filtri. <%= link_to "Mostra tutti i brani", music_tracks_path %></p>
+<% else %>
+  <div class="elenco-post elenco-brani">
+    <div class="elenco-testa" aria-hidden="true">
+      <span>Brano</span><span>Atmosfera e ritmo</span><span>Ascolta</span><span>Durata</span><span></span>
+    </div>
+    <% @tracks.each do |track| %>
+      <div class="riga riga-brano <%= 'brano-spento' unless track.enabled? %>" id="<%= dom_id(track) %>">
+        <div class="riga-principale">
+          <span class="riga-titolo"><%= track.title %></span>
+          <span class="riga-estratto">
+            <%= [ track.author.presence, (track.vocals? ? "con voce" : "strumentale"), track.instruments.presence ].compact.join(" · ") %>
+          </span>
+          <% if track.suitable_for.present? %><span class="riga-estratto">Adatto a: <%= track.suitable_for %></span><% end %>
+          <% unless track.enabled? %><span><span class="pill pill-draft">Disattivato</span></span><% end %>
+        </div>
+        <div class="riga-segni-brano">
+          <% track.moods.each do |mood| %><span class="pill pill-scheduled"><%= mood %></span><% end %>
+          <span class="pill pill-neutra">ritmo <%= track.tempo %></span>
+        </div>
+        <div>
+          <% if track.audio.attached? %>
+            <%= audio_tag rails_blob_path(track.audio, disposition: "inline"), controls: true, preload: "none",
+                          "aria-label": "Ascolta #{track.title}" %>
+          <% end %>
+        </div>
+        <span class="data-mono"><%= track.duration_label %></span>
+        <div class="azioni-brano">
+          <%= link_to "Modifica", edit_music_track_path(track), class: "bottone" %>
+          <%= button_to "Elimina", music_track_path(track), method: :delete, class: "bottone bottone-pericolo",
+                        form: { data: { turbo_confirm: "Il brano «#{track.title}» verrà cancellato dalla musicoteca, con il suo file audio. I video già montati non cambiano. L'azione è irreversibile.",
+                                        confirm_title: "Eliminare il brano?", confirm_button: "Elimina", confirm_tone: "pericolo" } } %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%= render "shared/paginazione", page: @page, pages: @pages %>

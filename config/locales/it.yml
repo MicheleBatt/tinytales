@@ -3,6 +3,7 @@ it:
     models:
       post: Post
       social_page: Pagina social
+      music_track: Brano
     attributes:
       post:
         title: Titolo
@@ -12,6 +13,20 @@ it:
         notes: Note
         media: Immagini e video
         social_pages: Pagine social
+      music_track:
+        title: Titolo
+        author: Autore
+        source_url: Link alla fonte
+        source_tags: Tag della fonte
+        license: Licenza
+        moods: Atmosfera
+        tempo: Ritmo
+        instruments: Strumenti
+        vocals: Voce
+        suitable_for: Adatto a
+        notes: Note
+        audio: File audio
+        enabled: Attivo
   errors:
     format: "%{attribute}: %{message}"
     messages:
@@ -23,6 +38,9 @@ it:
     submit:
       post:
         create: Crea il post
+        update: Salva le modifiche
+      music_track:
+        create: Aggiungi il brano
         update: Salva le modifiche
   date:
     abbr_day_names: [dom, lun, mar, mer, gio, ven, sab]

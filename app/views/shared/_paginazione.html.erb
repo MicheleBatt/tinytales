@@ -1,0 +1,17 @@
+<%# Paginazione semplice: tiene i filtri della pagina e cambia solo «page». Locals: page, pages. %>
+<% if pages > 1 %>
+  <% link = ->(n) { url_for(request.query_parameters.merge("page" => n)) } %>
+  <nav class="paginazione" aria-label="Pagine">
+    <% if page > 1 %>
+      <%= link_to "← Precedente", link.(page - 1), class: "bottone bottone-secondario", rel: "prev" %>
+    <% else %>
+      <span class="bottone bottone-secondario disattivo" aria-disabled="true">← Precedente</span>
+    <% end %>
+    <span class="paginazione-stato">Pagina <span class="data-mono"><%= page %></span> di <span class="data-mono"><%= pages %></span></span>
+    <% if page < pages %>
+      <%= link_to "Successiva →", link.(page + 1), class: "bottone bottone-secondario", rel: "next" %>
+    <% else %>
+      <span class="bottone bottone-secondario disattivo" aria-disabled="true">Successiva →</span>
+    <% end %>
+  </nav>
+<% end %>

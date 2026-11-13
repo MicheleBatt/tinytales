@@ -1,0 +1,16 @@
+# I siti che Claude può leggere quando nella chat accendi «🌐 Internet» (vale solo per quel messaggio).
+# La ricerca sul web resta libera; aprire e leggere le pagine invece si può solo su questi siti.
+#
+# Un sito per riga: solo il nome, senza https:// e senza percorso. «www.» si aggiunge da solo
+# (scrivere «ioleggoperche.it» apre anche «www.ioleggoperche.it»); gli altri sottodomini vanno scritti per intero.
+# Le modifiche valgono dal messaggio successivo, senza riavviare l'app.
+siti:
+  - scuolainfanziacreola.it          # il sito della scuola, online
+  - comune.saccolongo.pd.it          # Comune di Saccolongo
+  - fismpadova.it                    # FISM Padova
+  - fism.net                         # FISM nazionale
+  - ioleggoperche.it                 # #ioleggoperché
+  - scuolafacendo.com                # Scuola Facendo
+  - unclickperlascuolaelosport.it    # Un click per la scuola
+  - riescoincucina.it                # la ditta della mensa
+  - it.wikipedia.org                 # per ricorrenze, santi e tradizioni

@@ -12,6 +12,8 @@ require "open3"
 # da Bash può usare solo ImageMagick (con regole che gli permettono di leggere le stesse cartelle
 # e di scrivere solo nella cartella di lavoro) e i comandi `bin/assistant`: quelli di sola lettura sui post
 # e quelli per montare i video, che usano ffmpeg al posto suo con controlli propri (Assistant::Video).
+# Internet è spento: solo per un messaggio in cui la persona accende «🌐 Internet» Claude può cercare sul web
+# e leggere le pagine, ma solo dei siti in config/siti_fidati.yml.
 class AssistantRunner
   CLAUDE = ENV.fetch("CLAUDE_BIN", File.expand_path("~/.local/bin/claude"))
   SITE_ROOT = Pathname(ENV.fetch("ASSISTANT_SITE_ROOT", "/home/michele/Progetti/scuola-infanzia-creola"))
@@ -26,6 +28,10 @@ class AssistantRunner
   POLICY_ROOT = Rails.root.join("tmp/imagemagick")
   # Gli unici strumenti di Claude: niente web, sotto-agenti, notebook o skill.
   TOOLS = %w[Read Glob Grep Edit Write Bash].freeze
+  # In più, solo nei messaggi con «🌐 Internet» acceso.
+  WEB_TOOLS = %w[WebSearch WebFetch].freeze
+  TRUSTED_SITES = Rails.root.join("config/siti_fidati.yml")
+  HOSTNAME = /\A(?=.{1,253}\z)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\z/
   # Le sole variabili d'ambiente che passano a Claude: quelle per funzionare e per avviare Ruby (bin/assistant).
   # Tutte le altre (chiavi, password, token di altri progetti) restano fuori.
   ENV_KEEP = %w[HOME USER LOGNAME PATH SHELL TERM LANG LANGUAGE TZ TMPDIR RAILS_ENV
@@ -33,9 +39,21 @@ class AssistantRunner
   ENV_KEEP_PREFIXES = %w[LC_ rvm_ ANTHROPIC_ CLAUDE_CONFIG_DIR].freeze
   TIMEOUT = 15.minutes
 
-  def initialize(conversation, form_state: {})
+  def initialize(conversation, form_state: {}, internet: false)
     @conversation = conversation
     @form_state = form_state.to_h.with_indifferent_access
+    @internet = internet
+  end
+
+  def internet? = @internet
+
+  # I siti dell'elenco, con e senza «www.». Le regole di Claude Code valgono per il nome esatto:
+  # «ioleggoperche.it» non apre «www.ioleggoperche.it». Le righe che non sono un nome di sito si scartano.
+  def self.trusted_sites(path = TRUSTED_SITES)
+    names = Array(YAML.safe_load_file(path)&.dig("siti")).map { |name| name.to_s.strip.downcase }
+    names.grep(HOSTNAME).flat_map { |name| [ name.delete_prefix("www."), "www.#{name.delete_prefix('www.')}" ] }.uniq
+  rescue Errno::ENOENT, Psych::Exception
+    []
   end
 
   def command
@@ -44,16 +62,17 @@ class AssistantRunner
               [ "Glob", "Grep", "Edit(/#{@conversation.outbox}/**)" ] +
               IMAGE_TOOLS.map { |tool| "Bash(#{tool}:*)" } +
               [ "Bash(#{ASSISTANT_BIN}:*)" ]
+    allowed += [ "WebSearch" ] + self.class.trusted_sites.map { |site| "WebFetch(domain:#{site})" } if internet?
     denied = SECRETS.flat_map { |pattern| [ "Read(/#{Rails.root}/#{pattern})", "Edit(/#{Rails.root}/#{pattern})" ] } +
              [ "Read(/#{SITE_ROOT}/.env*)" ] +
-             outside_paths.flat_map { |path| [ "Read(/#{path})", "Read(/#{path}/**)" ] } +
+             (outside_paths - [ own_session_dir.to_s ]).flat_map { |path| [ "Read(/#{path})", "Read(/#{path}/**)" ] } +
              [ "Read(/#{MEMORY_DIR.parent}/*.jsonl)" ] # le trascrizioni delle sessioni, anche quelle nuove
 
     cmd = [ CLAUDE, "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
             "--permission-mode", "default", "--max-turns", "40",
             # Nessuna impostazione esterna (i permessi accumulati nelle impostazioni del sito e della home,
             # hook, plugin), nessun connettore MCP dell'account, solo gli strumenti elencati, niente skill.
-            "--setting-sources", "", "--strict-mcp-config", "--tools", TOOLS.join(","), "--disable-slash-commands",
+            "--setting-sources", "", "--strict-mcp-config", "--tools", tools.join(","), "--disable-slash-commands",
             "--append-system-prompt", system_prompt,
             "--add-dir", Rails.root.to_s, "--add-dir", @conversation.outbox.to_s ]
     cmd += [ "--add-dir", MEMORY_DIR.to_s ] if MEMORY_DIR.directory?
@@ -61,12 +80,22 @@ class AssistantRunner
     cmd + [ "--allowedTools", *allowed, "--disallowedTools", *denied ]
   end
 
+  def tools = internet? ? TOOLS + WEB_TOOLS : TOOLS
+
   # L'ambiente di Claude: solo le variabili necessarie (senza quelle di Bundler dell'app e senza DATABASE,
   # che rompe alcuni comandi di Rails), più le regole di ImageMagick.
   def claude_env
     Bundler.unbundled_env
            .select { |key, _| ENV_KEEP.include?(key) || ENV_KEEP_PREFIXES.any? { |prefix| key.start_with?(prefix) } }
            .merge("MAGICK_CONFIGURE_PATH" => imagemagick_policy.to_s)
+  end
+
+  # La cartella della sessione di Claude di questa chat: lì Claude Code salva i file presi dal web (per esempio
+  # i PDF letti con WebFetch) e li rilegge. Contiene solo cose di questa chat, quindi non si vieta;
+  # le cartelle delle altre sessioni (anche quelle di chi usa Claude Code sul computer) restano vietate.
+  def own_session_dir
+    id = @conversation.claude_session_id.to_s
+    MEMORY_DIR.parent.join(id) if id.match?(/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/)
   end
 
   # Le cartelle che Claude può leggere: sito, app (tranne i segreti), memoria del progetto.
@@ -143,9 +172,20 @@ class AssistantRunner
       #{s[:body]}
       >>>
       #{attachments_section(attachments)}
+      #{internet_section}
       [Messaggio]
       #{message}
     TXT
+  end
+
+  def internet_section
+    if internet?
+      "[Internet: acceso per questo messaggio]\nPuoi cercare sul web (WebSearch) e leggere pagine (WebFetch) " \
+        "solo di questi siti: #{self.class.trusted_sites.reject { |site| site.start_with?('www.') }.join(', ')} " \
+        "(con o senza www.). Vedi la sezione «Internet» delle istruzioni.\n"
+    else
+      "[Internet: spento]\n"
+    end
   end
 
   def attachments_section(attachments)
@@ -265,7 +305,8 @@ class AssistantRunner
         when "Write", "Edit" then "Scrivo #{file}"
         when "Glob", "Grep" then "Cerco nei file"
         when "Bash" then bash_activity(input["command"].to_s.squish)
-        when "WebSearch", "WebFetch" then "Cerco sul web"
+        when "WebSearch" then "Cerco sul web: «#{input['query'].to_s.truncate(60)}»"
+        when "WebFetch" then "Leggo la pagina #{(URI(input['url'].to_s).host rescue nil) || 'web'}"
         else block["name"].to_s
         end
       { type: "activity", text: }
@@ -278,6 +319,10 @@ class AssistantRunner
       when /\A\S*bin\/assistant post (\d+)\z/ then "Leggo il post #{$1}"
       when /\A\S*bin\/assistant video (\S+)\z/ then "Monto il video (#{File.basename($1)})"
       when /\A\S*bin\/assistant fotogramm[ia] (\S+)/ then "Guardo il video #{File.basename($1)}"
+      when /\A\S*bin\/assistant musica\z/ then "Sfoglio la musicoteca"
+      when /\A\S*bin\/assistant facebook\z/ then "Guardo foto e video della pagina Facebook"
+      when /\A\S*bin\/assistant facebook anteprime / then "Guardo le anteprime dalla pagina Facebook"
+      when /\A\S*bin\/assistant facebook scarica / then "Scarico dalla pagina Facebook"
       when /\A(convert|magick|montage|composite)\b/
         output = command.scan(/\S+\.(?:jpe?g|png|webp|gif)\b/i).last
         output ? "Preparo l'immagine #{File.basename(output)}" : "Preparo un'immagine"

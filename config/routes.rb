@@ -12,6 +12,12 @@ Rails.application.routes.draw do
     end
   end
 
+  # La musicoteca: i brani per il sottofondo dei video montati da Claude.
+  resources :music_tracks, path: "musicoteca", except: :show do
+    # «✦ Compila con Claude»: propone la scheda del brano, senza salvare.
+    post :autofill, path: "compila", on: :collection
+  end
+
   # La chat con l'assistente nelle pagine di creazione e modifica dei post.
   post "assistente/messaggi", to: "assistant_messages#create", as: :assistant_messages
   get "assistente/file/:token/:name", to: "assistant_files#show", as: :assistant_file,

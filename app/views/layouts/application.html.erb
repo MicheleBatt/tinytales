@@ -30,6 +30,8 @@
           </span>
         <% end %>
         <nav class="link-pagine">
+          <%= link_to "Musicoteca", music_tracks_path, class: [ "link-pagina", ("link-pagina-attiva" if controller_name == "music_tracks") ],
+                      title: "I brani per il sottofondo dei video di Claude" %>
           <%= link_to "Checklist ↗", checklist_url, class: "link-pagina", target: "_blank", rel: "noopener",
                       title: "Lo stato dei lavori su sito e pagine social (pagina privata su claude.ai)" %>
           <% SocialPage.by_name.each do |page| %>

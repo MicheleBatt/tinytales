@@ -75,6 +75,64 @@ class AssistantRunnerTest < ActiveSupport::TestCase
     FileUtils.rm_rf(dir) if dir
   end
 
+  test "internet è spento: niente strumenti per il web" do
+    runner = AssistantRunner.new(@conversation)
+    cmd = runner.command
+    assert_not runner.internet?
+    assert_not cmd[cmd.index("--tools") + 1].include?("Web")
+    assert_not cmd.any? { |arg| arg.start_with?("Web") }
+    assert_includes runner.prompt("ciao"), "[Internet: spento]"
+  end
+
+  test "con «Internet» acceso: ricerca libera, lettura solo dei siti fidati" do
+    runner = AssistantRunner.new(@conversation, internet: true)
+    cmd = runner.command
+    allowed = cmd[(cmd.index("--allowedTools") + 1)...cmd.index("--disallowedTools")]
+
+    assert_equal "Read,Glob,Grep,Edit,Write,Bash,WebSearch,WebFetch", cmd[cmd.index("--tools") + 1]
+    assert_includes allowed, "WebSearch"
+    assert_includes allowed, "WebFetch(domain:ioleggoperche.it)"
+    assert_includes allowed, "WebFetch(domain:www.ioleggoperche.it)"
+    assert_includes allowed, "WebFetch(domain:it.wikipedia.org)"
+    assert_not_includes allowed, "WebFetch", "la lettura delle pagine non è libera"
+    assert_not allowed.any? { |rule| rule.include?("domain:*") }
+
+    prompt = runner.prompt("cerca")
+    assert_includes prompt, "[Internet: acceso per questo messaggio]"
+    assert_includes prompt, "ioleggoperche.it"
+    assert prompt.index("[Internet") < prompt.index("[Messaggio]")
+  end
+
+  test "l'elenco dei siti fidati tiene solo nomi di siti, con e senza www" do
+    file = Tempfile.new([ "siti", ".yml" ])
+    file.write({ "siti" => [ "Esempio.it", "www.altro.org", "https://con-indirizzo.it/x", "*.jolly.it", "", nil, "sotto.dominio.com" ] }.to_yaml)
+    file.close
+    assert_equal %w[esempio.it www.esempio.it altro.org www.altro.org sotto.dominio.com www.sotto.dominio.com],
+                 AssistantRunner.trusted_sites(file.path)
+    assert_equal [], AssistantRunner.trusted_sites("/non/esiste.yml")
+  ensure
+    file&.unlink
+  end
+
+  test "la cartella della sessione di questa chat resta leggibile, quelle delle altre sessioni no" do
+    skip "serve la memoria del progetto di Claude" unless AssistantRunner::MEMORY_DIR.directory?
+    own = SecureRandom.uuid
+    other = SecureRandom.uuid
+    project = AssistantRunner::MEMORY_DIR.parent
+    [ own, other ].each { |id| project.join(id).mkpath }
+    @conversation.update!(claude_session_id: own)
+    denied = AssistantRunner.new(@conversation).command.then { |cmd| cmd[(cmd.index("--disallowedTools") + 1)..] }
+
+    assert_includes denied, "Read(/#{project.join(other)}/**)"
+    assert_not denied.any? { |rule| rule.include?(own) }
+    assert_includes denied, "Read(/#{project}/*.jsonl)"
+
+    @conversation.update!(claude_session_id: "../memory")
+    assert_nil AssistantRunner.new(@conversation).own_session_dir
+  ensure
+    [ own, other ].each { |id| FileUtils.rm_rf(project.join(id)) if id && project.join(id).basename.to_s == id }
+  end
+
   test "riprende la sessione di Claude della conversazione" do
     @conversation.update!(claude_session_id: "abc-123")
     cmd = AssistantRunner.new(@conversation).command
@@ -145,6 +203,12 @@ class AssistantRunnerTest < ActiveSupport::TestCase
     assert_equal "Controllo un'immagine", say.("identify /tmp/x.png")
     assert_equal "Monto il video (_video-festa.json)", say.("#{AssistantRunner::ASSISTANT_BIN} video /x/_video-festa.json")
     assert_equal "Guardo il video festa.mp4", say.("#{AssistantRunner::ASSISTANT_BIN} fotogrammi /x/festa.mp4 6")
+    assert_equal "Sfoglio la musicoteca", say.("#{AssistantRunner::ASSISTANT_BIN} musica")
+    assert_equal "Guardo foto e video della pagina Facebook", say.("#{AssistantRunner::ASSISTANT_BIN} facebook")
+    assert_equal "Scarico dalla pagina Facebook", say.("#{AssistantRunner::ASSISTANT_BIN} facebook scarica /x 123456")
+    web = ->(name, input) { parser.parse({ type: "assistant", message: { content: [ { type: "tool_use", name:, input: } ] } }.to_json).first[:text] }
+    assert_equal "Cerco sul web: «festa dei nonni 2026»", web.("WebSearch", { query: "festa dei nonni 2026" })
+    assert_equal "Leggo la pagina www.ioleggoperche.it", web.("WebFetch", { url: "https://www.ioleggoperche.it/scuole" })
     assert_equal "Eseguo: ls", say.("ls")
   end
 

@@ -7,11 +7,12 @@ class AssistantTest < ActionDispatch::IntegrationTest
   class FakeRunner
     cattr_accessor :last
     cattr_accessor :creates, default: {}
-    attr_reader :conversation, :form_state, :attachments, :seen
+    attr_reader :conversation, :form_state, :attachments, :seen, :internet
 
-    def initialize(conversation, form_state: {})
+    def initialize(conversation, form_state: {}, internet: false)
       @conversation = conversation
       @form_state = form_state
+      @internet = internet
       self.class.last = self
     end
 
@@ -65,6 +66,17 @@ class AssistantTest < ActionDispatch::IntegrationTest
     conversation = posts(:mensa).reload.assistant_conversation
     assert_equal [ "user", "assistant" ], conversation.messages.map(&:role)
     assert_equal "Ecco: ```proposta:titolo\nTITOLO NUOVO\n```", conversation.messages.last.content
+  end
+
+  test "internet arriva a Claude solo se acceso per quel messaggio" do
+    get edit_post_path(posts(:mensa))
+    assert_select "button.bottone-internet[aria-pressed=false][data-action='assistant#toggleInternet']", /Internet/
+
+    post assistant_messages_path, params: { token: @token, message: "cerca", internet: "1" }
+    assert FakeRunner.last.internet
+
+    post assistant_messages_path, params: { token: @token, message: "ciao" }
+    assert_not FakeRunner.last.internet
   end
 
   test "la conversazione del post si ritrova riaprendo la modifica" do

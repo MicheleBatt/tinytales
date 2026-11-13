@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_26_161214) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -61,6 +61,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_161214) do
     t.datetime "updated_at", null: false
     t.index ["assistant_conversation_id"], name: "index_assistant_messages_on_assistant_conversation_id"
     t.check_constraint "role::text = ANY (ARRAY['user'::character varying, 'assistant'::character varying]::text[])", name: "assistant_messages_role_valid"
+  end
+
+  create_table "music_tracks", force: :cascade do |t|
+    t.string "author"
+    t.datetime "created_at", null: false
+    t.float "duration"
+    t.boolean "enabled", default: true, null: false
+    t.string "instruments"
+    t.string "license", null: false
+    t.string "moods", default: [], null: false, array: true
+    t.text "notes"
+    t.string "source_tags"
+    t.string "source_url", null: false
+    t.string "suitable_for"
+    t.string "tempo", null: false
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.boolean "vocals", default: false, null: false
+    t.index ["title"], name: "index_music_tracks_on_title"
   end
 
   create_table "posts", force: :cascade do |t|

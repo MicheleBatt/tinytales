@@ -51,6 +51,18 @@ module Assistant
 
     attr_reader :outbox, :output, :width, :height
 
+    # Chi trova i brani della musicoteca: lo imposta l'app (task assistant:video), che ha il database.
+    # Riceve il numero del brano e restituisce { path:, ext:, title: }, oppure nil.
+    #
+    # I file allegati ai post stanno in Active Storage, che sul disco li salva senza estensione: il formato
+    # lo dice l'app (stored_extension: percorso → «.jpg», oppure nil), che conosce anche la cartella (storage_root).
+    class << self
+      attr_accessor :music_resolver, :stored_extension
+      attr_writer :storage_root
+
+      def storage_root = @storage_root || File.join(APP_ROOT, "storage")
+    end
+
     def initialize(recipe_path)
       path = self.class.real_path(recipe_path)
       raise Error, "La ricetta deve essere un file .json." unless File.extname(path).downcase == ".json"
@@ -84,7 +96,7 @@ module Assistant
     def summary
       size = File.size(output) / 1024.0 / 1024
       "Video creato: #{output}\n#{width}×#{height}, #{num_it(@total)} s, #{@scenes.size} scene, " \
-        "#{@audio ? 'con musica' : 'senza audio'}, #{format('%.1f', size).tr('.', ',')} MB.\n" \
+        "#{@audio ? "musica #{@music_title}" : 'senza audio'}, #{format('%.1f', size).tr('.', ',')} MB.\n" \
         "Per controllarlo: #{File.join(APP_ROOT, 'bin/assistant')} fotogrammi #{output}"
     end
 
@@ -152,8 +164,8 @@ module Assistant
       video
     end
 
-    def self.input_args(path)
-      ext = File.extname(path).downcase
+    # `ext` serve per i file di Active Storage, che sul disco non hanno estensione.
+    def self.input_args(path, ext = File.extname(path).downcase)
       demuxer = IMAGES[ext] || VIDEOS[ext] || AUDIO[ext] or raise Error, "Formato non ammesso: #{path}"
       extra = demuxer == "image2" ? [ "-pattern_type", "none" ] : []
       [ "-protocol_whitelist", "file", "-f", demuxer, *extra, "-i", "file:#{path}" ]
@@ -247,11 +259,11 @@ module Assistant
       index =
         if scene["immagine"] && !scene["video"]
           path = readable(scene["immagine"], IMAGES, "#{label}, «immagine»")
-          add_input([ "-loop", "1", "-framerate", FPS.to_s, "-t", num(d), *self.class.input_args(path) ])
+          add_input([ "-loop", "1", "-framerate", FPS.to_s, "-t", num(d), *input_args_for(path) ])
         elsif scene["video"] && !scene["immagine"]
           path = readable(scene["video"], VIDEOS, "#{label}, «video»")
           from = number(scene.fetch("da", 0), "#{label}, «da»", (0..3600))
-          add_input([ "-ss", num(from), "-t", num(d), *self.class.input_args(path) ])
+          add_input([ "-ss", num(from), "-t", num(d), *input_args_for(path) ])
         else
           raise Error, "#{label}: serve «immagine» oppure «video» (uno solo dei due)."
         end
@@ -308,7 +320,7 @@ module Assistant
       speed = number(layer.fetch("durata_entrata", 0.6), "#{label}, «durata_entrata»", (0.1..3))
       stop = layer["fine"] && number(layer["fine"], "#{label}, «fine»", (start..d))
 
-      index = add_input([ "-loop", "1", "-framerate", FPS.to_s, "-t", num(d), *self.class.input_args(path) ])
+      index = add_input([ "-loop", "1", "-framerate", FPS.to_s, "-t", num(d), *input_args_for(path) ])
       chain = [ "setpts=PTS-STARTPTS", "fps=#{FPS}", "scale=#{width}:#{height}:force_original_aspect_ratio=decrease", "format=rgba" ]
       chain << "fade=t=in:st=#{num(start)}:d=#{num(speed)}:alpha=1" if entry == "dissolvenza"
       chain << "fade=t=out:st=#{num(stop)}:d=0.4:alpha=1" if stop
@@ -373,16 +385,45 @@ module Assistant
 
     def build_music(spec)
       spec = { "file" => spec } if spec.is_a?(String)
-      raise Error, "«musica»: un percorso o un oggetto con «file», «volume» e «da»." unless spec.is_a?(Hash)
+      unless spec.is_a?(Hash) && (spec.key?("brano") ^ spec.key?("file"))
+        raise Error, "«musica»: un oggetto con «brano» (il numero di un brano della musicoteca) oppure «file» " \
+                     "(una traccia allegata nella chat), più «volume» e «da»."
+      end
 
-      path = readable(spec["file"], AUDIO, "«musica»")
+      path, ext = spec.key?("brano") ? library_track(spec["brano"]) : attached_track(spec["file"])
       volume = number(spec.fetch("volume", 0.8), "«musica», «volume»", (0.05..1.5))
       from = number(spec.fetch("da", 0), "«musica», «da»", (0..3600))
-      index = add_input([ "-stream_loop", "-1", "-ss", num(from), *self.class.input_args(path) ])
+      index = add_input([ "-stream_loop", "-1", "-ss", num(from), *self.class.input_args(path, ext) ])
       fade = [ 2.0, @total / 2 ].min
-      @filters << "[#{index}:a]atrim=duration=#{num(@total)},asetpts=PTS-STARTPTS,volume=#{num(volume)}," \
+      # loudnorm porta tutti i brani allo stesso volume percepito, così «volume» vale allo stesso modo per tutti.
+      @filters << "[#{index}:a]atrim=duration=#{num(@total)},asetpts=PTS-STARTPTS,loudnorm=I=-18:TP=-2:LRA=11," \
+                  "aresample=48000,volume=#{num(volume)}," \
                   "afade=t=in:st=0:d=0.3,afade=t=out:st=#{num(@total - fade)}:d=#{num(fade)}[a]"
       true
+    end
+
+    # Un brano della musicoteca, indicato per numero: il file lo trova l'app nel database (music_resolver),
+    # così Claude non indica mai un percorso. Vale solo per i brani attivi.
+    def library_track(id)
+      id = (id.is_a?(Integer) || id.is_a?(String)) && id.to_s.match?(/\A\d+\z/) ? id.to_i : nil
+      raise Error, "«musica», «brano»: il numero di un brano (vedi bin/assistant musica)." unless id
+      raise Error, "«musica»: la musicoteca si usa solo dall'app (bin/assistant video)." unless self.class.music_resolver
+
+      track = self.class.music_resolver.call(id)
+      raise Error, "«musica»: il brano #{id} non c'è o è disattivato (vedi bin/assistant musica)." unless track
+      raise Error, "«musica»: il file del brano #{id} non si trova." unless File.file?(track[:path])
+
+      @music_title = "«#{track[:title]}» (brano #{id})"
+      [ track[:path], track[:ext] ]
+    end
+
+    # Una traccia allegata dalla persona in questa chat: solo dalla cartella di lavoro.
+    def attached_track(value)
+      path = readable(value, AUDIO, "«musica», «file»")
+      raise Error, "«musica», «file»: solo tracce allegate nella chat (cartella di lavoro)." unless path.start_with?("#{outbox}/")
+
+      @music_title = "«#{File.basename(path)}» (allegata)"
+      [ path, File.extname(path).downcase ]
     end
 
     # --- Valori ---------------------------------------------------------------------------------------
@@ -393,17 +434,27 @@ module Assistant
       raise Error, "#{label}: manca il percorso del file." if value.to_s.empty?
 
       path = self.class.real_path(value)
-      roots = [ SITE_ROOT, File.join(APP_ROOT, "lib/assistant/risorse"), File.join(APP_ROOT, "storage"), outbox ]
-                .select { |root| File.exist?(root) }.map { |root| File.realpath(root) }
+      storage = File.exist?(self.class.storage_root) ? File.realpath(self.class.storage_root) : nil
+      roots = [ SITE_ROOT, File.join(APP_ROOT, "lib/assistant/risorse"), outbox ]
+                .select { |root| File.exist?(root) }.map { |root| File.realpath(root) } + [ storage ].compact
       unless roots.any? { |root| path.start_with?("#{root}/") } && FORBIDDEN.none? { |pattern| path.match?(pattern) }
         raise Error, "#{label}: puoi usare solo file del sito, delle risorse, dei post o della cartella di lavoro (#{value})."
       end
-      unless kinds.key?(File.extname(path).downcase)
+
+      ext = File.extname(path).downcase
+      if ext.empty? && storage && path.start_with?("#{storage}/") && self.class.stored_extension
+        ext = self.class.stored_extension.call(path).to_s.downcase
+      end
+      unless kinds.key?(ext)
         raise Error, "#{label}: formato non ammesso (#{kinds.keys.join(', ')}): #{value}"
       end
 
+      (@extensions ||= {})[path] = ext
       path
     end
+
+    # Gli argomenti di ffmpeg per un file già controllato da `readable`, con il formato trovato lì.
+    def input_args_for(path) = self.class.input_args(path, @extensions.fetch(path))
 
     def number(value, label, range)
       n = value.is_a?(Numeric) ? value.to_f : nil

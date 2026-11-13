@@ -21,7 +21,8 @@
       <div class="assistente-intro" data-assistant-target="intro" <%= "hidden" if @assistant_messages.any? %>>
         <p>Chiedimi di scrivere o rivedere il testo, proporre un titolo, preparare una grafica.
            Puoi anche allegarmi una bozza, un PDF, foto o video con <strong>«📎 Allega»</strong> o trascinandoli qui.
-           Le mie proposte compaiono qui con il pulsante <strong>«Applica al form»</strong>: niente cambia finché non le applichi e salvi.</p>
+           Le mie proposte compaiono qui con il pulsante <strong>«Applica al form»</strong>: niente cambia finché non le applichi e salvi.
+           Se serve una ricerca sul web, accendi <strong>«🌐 Internet»</strong> prima di inviare: vale solo per quel messaggio.</p>
         <div class="assistente-spunti">
           <% assistant_hints(post).each do |hint| %>
             <button type="button" class="spunto" data-action="assistant#suggest"><%= hint %></button>
@@ -48,6 +49,9 @@
                data-assistant-target="fileInput" data-action="change->assistant#filesChosen">
         <button type="button" class="bottone bottone-secondario bottone-allega" data-assistant-target="attach"
                 data-action="assistant#chooseFiles" title="Allega testi, PDF, immagini, video o musica (anche trascinandoli qui)">📎 Allega</button>
+        <button type="button" class="bottone bottone-secondario bottone-internet" aria-pressed="false"
+                data-assistant-target="internet" data-action="assistant#toggleInternet"
+                title="Solo per il prossimo messaggio: Claude può cercare sul web e leggere le pagine dei siti fidati (config/siti_fidati.yml)">🌐 Internet</button>
         <span class="assistente-stato" data-assistant-target="status"></span>
         <button type="button" class="bottone bottone-secondario" data-assistant-target="stop" data-action="assistant#stop" hidden>Interrompi</button>
         <button type="button" class="bottone" data-assistant-target="send" data-action="assistant#send">Invia</button>
