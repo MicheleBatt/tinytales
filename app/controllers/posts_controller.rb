@@ -2,15 +2,13 @@ class PostsController < ApplicationController
   SEARCH_FIELDS = %i[title_or_body_or_notes_cont status_eq social_pages_id_eq
                      publish_at_gteq publish_at_lteq notes_present s].freeze
 
-  before_action :promote_due_scheduled, only: %i[index show preview]
+  before_action :promote_due_scheduled, only: %i[index show preview report]
   before_action :set_post, only: %i[show preview edit update destroy publish schedule unpublish resync]
   before_action :set_social_pages, only: %i[index new create edit update]
   before_action :set_assistant, only: %i[new create edit update]
 
   def index
-    @q = Post.ransack(search_params)
-    @q.sorts = [ "publish_at desc", "id desc" ] if @q.sorts.empty?
-    @posts = @q.result(distinct: true).includes(:social_pages, media_attachments: :blob)
+    @posts = filtered_posts
 
     @view = chosen_view
     prepare_calendar if @view == "calendario"
@@ -19,6 +17,16 @@ class PostsController < ApplicationController
   end
 
   def show
+  end
+
+  # Il report in PDF dei post, con gli stessi filtri dell'elenco. Lo prepara Chrome: qualche secondo.
+  def report
+    posts = filtered_posts.includes(publications: :social_page)
+    pdf = PostsReport.new(posts, filters: filters_summary).to_pdf
+    send_data pdf, type: "application/pdf", disposition: "attachment",
+                   filename: "report-post-scuola-creola-#{Date.current.iso8601}.pdf"
+  rescue PostsReport::Error => error
+    render json: { error: error.message }, status: :internal_server_error
   end
 
   # L'anteprima del post nel popup della vista a calendario (solo il contenuto, senza layout).
@@ -107,6 +115,26 @@ class PostsController < ApplicationController
 
   VIEWS = %w[lista griglia calendario].freeze
 
+  # I post secondo i filtri Ransack dell'elenco (gli stessi per la pagina e per il report).
+  def filtered_posts
+    @q = Post.ransack(search_params)
+    @q.sorts = [ "publish_at desc", "id desc" ] if @q.sorts.empty?
+    @q.result(distinct: true).includes(:social_pages, media_attachments: :blob)
+  end
+
+  # I filtri attivi detti a parole, per il frontespizio del report.
+  def filters_summary
+    q = params.fetch(:q, {}).permit(*SEARCH_FIELDS)
+    page = SocialPage.find_by(id: q[:social_pages_id_eq]) if q[:social_pages_id_eq].present?
+    day = ->(value) { (I18n.l(Date.iso8601(value.to_s), format: :long) rescue nil) }
+    [ ("testo che contiene «#{q[:title_or_body_or_notes_cont].strip}»" if q[:title_or_body_or_notes_cont].present?),
+      ("stato: #{helpers.status_label(q[:status_eq]).downcase}" if PostsHelper::STATUS_LABELS.key?(q[:status_eq])),
+      ("pagina: #{page.platform_label} (#{page.name})" if page),
+      ("dal #{day.(q[:publish_at_gteq])}" if day.(q[:publish_at_gteq])),
+      ("al #{day.(q[:publish_at_lteq])}" if day.(q[:publish_at_lteq])),
+      ("solo post con note" if q[:notes_present] == "1") ].compact
+  end
+
   # Lista (predefinita), griglia o calendario. La scelta arriva con ?vista= (icone) e resta in un cookie;
   # tra lista e griglia si passa anche senza ricaricare, e allora il cookie lo scrive il browser.
   def chosen_view
@@ -188,8 +216,22 @@ class PostsController < ApplicationController
   # Le pagine social di un post già uscito o programmato non si cambiano dal form:
   # toglierne una vorrebbe dire cancellare prima il post da lì.
   def post_params
-    permitted = params.expect(post: [ :title, :body, :publish_at, :notes, social_page_ids: [], media: [] ])
+    permitted = params.expect(post: [ :title, :body, :publish_at, :notes, social_page_ids: [], media: [], new_media: {} ])
+    permitted = with_new_media(permitted)
     @post&.persisted? && !@post.draft? ? permitted.except(:social_page_ids) : permitted
+  end
+
+  # I file nuovi arrivano a parte (post[new_media][codice]); nell'elenco ordinato post[media][] al loro posto
+  # c'è «nuovo:codice». Li rimettiamo lì, così l'ordine scelto nella pagina vale anche per loro.
+  # Un segnaposto senza file (o un file senza segnaposto) si scarta.
+  def with_new_media(permitted)
+    uploads = permitted.delete(:new_media)&.to_h || {}
+    return permitted unless permitted.key?(:media)
+
+    permitted[:media] = Array(permitted[:media]).filter_map do |entry|
+      entry.is_a?(String) && entry.start_with?("nuovo:") ? uploads[entry.delete_prefix("nuovo:")] : entry
+    end
+    permitted
   end
 
   # Il filtro "fino al" arriva come giorno: va incluso tutto quel giorno.

@@ -1,0 +1,358 @@
+<%# Il report dei post da stampare in PDF con Chrome (PostsReport). Assigns: @report, @pages (ancora → pagina). %>
+<% page_of = ->(anchor) { (n = @pages[anchor]) ? n.to_s : "  " } %>
+<% cards = @report.cards %>
+<% dated = cards.map(&:post).select(&:publish_at) %>
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Report dei post · Scuola dell'Infanzia Santa Maria Goretti – Creola</title>
+<style>
+  /* Caratteri di sistema (Lato, Noto Serif): già installati, quindi le misure per stare in una pagina sono esatte. */
+  :root {
+    --inchiostro: #1E2430; --tenue: #5F6B7A; --chiaro: #8A94A3; --linea: #D9DEE5; --fondo: #F5F7FA;
+    --accento: #1F3A5F;
+    --pubblicato: #1F6B45; --pubblicato-fondo: #E8F3EC;
+    --programmato: #1F4E8C; --programmato-fondo: #E8EFF8;
+    --bozza: #8A5A12; --bozza-fondo: #F8F0E1;
+    --avviso: #A3461B; --avviso-fondo: #FBF1EA;
+    --serif: "Noto Serif", "DejaVu Serif", serif;
+    --sans: "Lato", "Noto Sans", "Noto Color Emoji", sans-serif;
+  }
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm;
+    @bottom-left { content: "Report dei post · Scuola dell'Infanzia Santa Maria Goretti – Creola · documento interno"; font: 7.5pt "Lato", sans-serif; color: #8A94A3; }
+    @bottom-right { content: "Pagina " counter(page) " di " counter(pages); font: 7.5pt "Lato", sans-serif; color: #8A94A3; }
+  }
+  @page :first { @bottom-left { content: none; } @bottom-right { content: none; } }
+
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font: 9.5pt/1.45 var(--sans); color: var(--inchiostro); }
+  a { color: inherit; text-decoration: none; }
+  p { margin: 0 0 2mm; }
+  h1 { font: 700 19pt/1.2 var(--serif); color: var(--accento); margin: 0 0 1.5mm; }
+  .regola { border: 0; border-top: .5mm solid var(--accento); margin: 0 0 5mm; width: 100%; }
+  .nuova-pagina { break-before: page; }
+
+  /* ---------- stati ---------- */
+  .stato { display: inline-block; font: 700 7.5pt/1 var(--sans); letter-spacing: .06em; text-transform: uppercase;
+           padding: 1mm 2mm; border-radius: .8mm; border: .25mm solid currentColor; white-space: nowrap; }
+  .stato-published { color: var(--pubblicato); background: var(--pubblicato-fondo); }
+  .stato-scheduled { color: var(--programmato); background: var(--programmato-fondo); }
+  .stato-draft { color: var(--bozza); background: var(--bozza-fondo); }
+  mark { background: #FCE7A1; color: inherit; padding: 0 .5mm; font-weight: 700; }
+
+  /* ---------- frontespizio ---------- */
+  .copertina { height: 266mm; display: flex; flex-direction: column; }
+  .intestazione { display: flex; align-items: center; gap: 5mm; padding-bottom: 4mm; border-bottom: .5mm solid var(--accento); }
+  .intestazione img { width: 22mm; height: 22mm; object-fit: contain; }
+  .intestazione strong { display: block; font: 700 12pt/1.25 var(--serif); color: var(--accento); }
+  .intestazione span { color: var(--tenue); font-size: 9pt; }
+  .copertina-corpo { margin-top: 50mm; }
+  .occhiello { font: 700 8pt/1 var(--sans); letter-spacing: .22em; color: var(--chiaro); margin-bottom: 4mm; }
+  .titolo-copertina { font: 700 34pt/1.1 var(--serif); color: var(--accento); margin: 0 0 3mm; }
+  .sottotitolo-copertina { font-size: 12pt; color: var(--tenue); margin-bottom: 12mm; }
+  .dati { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-bottom: 8mm; }
+  .dati th { text-align: left; width: 42mm; color: var(--tenue); font-weight: 400; padding: 2mm 0; border-top: .25mm solid var(--linea); vertical-align: top; }
+  .dati td { padding: 2mm 0; border-top: .25mm solid var(--linea); font-weight: 700; }
+  .riepilogo { display: grid; grid-template-columns: repeat(4, 1fr); border: .25mm solid var(--linea); }
+  .riepilogo div { padding: 4mm 4mm 3mm; border-left: .25mm solid var(--linea); }
+  .riepilogo div:first-child { border-left: 0; }
+  .riepilogo strong { display: block; font: 700 22pt/1 var(--serif); color: var(--c); margin-bottom: 1.5mm; }
+  .riepilogo span { font-size: 8.5pt; color: var(--tenue); }
+  .firma { margin-top: auto; padding-top: 4mm; border-top: .25mm solid var(--linea); font-size: 8.5pt; color: var(--tenue); }
+  .firma strong { color: var(--inchiostro); }
+
+  /* ---------- premessa ---------- */
+  .premessa { font-size: 9.6pt; line-height: 1.5; }
+  .premessa p, .premessa li { text-align: justify; hyphens: auto; }
+  .capitolo { font: 700 8pt/1 var(--sans); letter-spacing: .14em; color: var(--accento); margin: 4.5mm 0 1.6mm; }
+  .premessa ul { margin: 0 0 2mm; padding-left: 5mm; }
+  .premessa li { margin-bottom: .8mm; }
+  .evidenza { border-left: .8mm solid var(--accento); background: var(--fondo); padding: 2.5mm 4mm; margin: 1mm 0 2mm; }
+  .evidenza p { margin: 0; }
+
+  /* ---------- indice ---------- */
+  .legenda { display: flex; flex-wrap: wrap; gap: 2mm 5mm; align-items: center; font-size: 8pt; color: var(--tenue); margin: -1mm 0 4mm; }
+  .indice { width: 100%; border-collapse: collapse; font-size: 8.6pt; }
+  .indice td { padding: 1.15mm 1.5mm; border-bottom: .2mm solid var(--linea); vertical-align: middle; }
+  .indice tr { break-inside: avoid; }
+  .indice .mese td { padding-top: 3mm; font: 700 7.5pt/1 var(--sans); letter-spacing: .14em; color: var(--accento); text-transform: uppercase;
+                     border-bottom: .35mm solid var(--accento); }
+  .indice .num { width: 8mm; text-align: right; color: var(--chiaro); }
+  .indice .quando { width: 34mm; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .indice .col-stato { width: 25mm; }
+  .indice .titolo a { font-weight: 700; }
+  .indice .segno { width: 24mm; text-align: right; color: var(--avviso); font-weight: 700; font-size: 7.5pt; white-space: nowrap; }
+  .indice .pag { width: 10mm; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; white-space: pre; }
+
+  /* ---------- scheda: esattamente una pagina ---------- */
+  .scheda { break-before: page; height: 266mm; overflow: hidden; display: flex; flex-direction: column; }
+  .scheda-testa { display: grid; grid-template-columns: 1fr auto; gap: 6mm; align-items: end; padding-bottom: 2.5mm; border-bottom: .5mm solid var(--accento); }
+  .scheda-num { font: 700 7.5pt/1 var(--sans); letter-spacing: .12em; color: var(--chiaro); margin-bottom: 1.5mm; }
+  .scheda h2 { font: 700 15pt/1.2 var(--serif); color: var(--inchiostro); margin: 0; }
+  .quando-scheda { text-align: right; }
+  .quando-scheda .data { display: block; font: 700 11pt/1.2 var(--serif); margin-top: 1.5mm; white-space: nowrap; }
+  .quando-scheda .ora { font-size: 9pt; color: var(--tenue); }
+  .quando-scheda.provvisoria .data { color: var(--bozza); }
+  .scheda-meta { display: flex; flex-wrap: wrap; gap: 1mm 4mm; font-size: 8pt; color: var(--tenue); padding: 1.8mm 0 0; }
+  .scheda-meta a { color: var(--programmato); }
+  .mancanze { margin-top: 3mm; border: .25mm solid #EBC9B3; border-left: 1mm solid var(--avviso); background: var(--avviso-fondo); padding: 2mm 3.5mm; font-size: 8.4pt; }
+  .mancanze strong { color: var(--avviso); font-size: 7.5pt; letter-spacing: .1em; }
+  .mancanze ul { margin: 1mm 0 0; padding-left: 4.5mm; columns: 2; column-gap: 7mm; }
+  .mancanze.poche ul { columns: 1; }
+  .mancanze li { break-inside: avoid; margin-bottom: .4mm; }
+  .pronto { margin-top: 3mm; font-size: 8.4pt; color: var(--pubblicato); font-weight: 700; }
+  .corpo { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 6mm; margin-top: 4mm; }
+  /* Le colonne arrivano fino in fondo alla pagina (servono a misurare lo spazio), i riquadri dentro no: stanno stretti al contenuto. */
+  .colonna { display: flex; flex-direction: column; align-items: flex-start; min-height: 0; min-width: 0; overflow: hidden; }
+  .etichetta { font: 700 7.5pt/1 var(--sans); letter-spacing: .12em; color: var(--tenue); margin-bottom: 1.8mm; }
+  .testo { flex: 0 1 auto; min-height: 0; width: 100%; overflow: hidden; position: relative; background: var(--fondo); border: .2mm solid var(--linea); padding: 2.5mm 3mm; }
+  .testo p { margin: 0 0 1.6mm; }
+  .testo p:last-child { margin-bottom: 0; }
+  .testo.tagliato { padding-bottom: 7mm; }
+  .testo.tagliato::after { content: "… il testo continua: versione completa nell'app"; position: absolute; left: 0; right: 0; bottom: 0;
+                           padding: 5mm 3mm 1.5mm; font-size: 7.5pt; font-style: italic; color: var(--tenue);
+                           background: linear-gradient(transparent, var(--fondo) 45%); }
+  .vuoto { border: .3mm dashed var(--linea); color: var(--chiaro); font-style: italic; padding: 2.5mm 3mm; }
+  /* Allegati in alto a sinistra, con le loro proporzioni; il riquadro di ciascuno sta stretto all'immagine. */
+  .allegati { display: grid; gap: 2.5mm; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr));
+              align-content: start; align-items: start; justify-items: start; }
+  .allegati.n1, .allegati.n2 { grid-template-columns: minmax(0, 1fr); }
+  .allegato { max-width: 100%; display: flex; flex-direction: column; border: .2mm solid var(--linea); padding: 1mm; }
+  .allegato .anteprima { position: relative; }
+  .allegato img { display: block; width: auto; height: auto; max-width: 100%; max-height: 190mm; }
+  .allegato .tipo { position: absolute; left: 1.2mm; top: 1.2mm; background: rgba(30, 36, 48, .82); color: #fff; font: 700 6.5pt/1 var(--sans);
+                    letter-spacing: .08em; padding: .8mm 1.5mm; border-radius: .6mm; }
+  .allegato .manca-anteprima { display: block; color: var(--chiaro); font-size: 7.5pt; padding: 2mm; }
+  /* La didascalia non allarga il riquadro: prende la larghezza dell'immagine e, se è lunga, si accorcia. */
+  .allegato .didascalia { width: 0; min-width: 100%; font-size: 6.8pt; line-height: 1.3; color: var(--tenue); margin-top: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .allegato.provvisoria { border-color: var(--avviso); }
+  .allegato.altri { color: var(--tenue); font-weight: 700; background: var(--fondo); padding: 2.5mm 3mm; }
+</style>
+</head>
+<body>
+
+<%# ---------- frontespizio ---------- %>
+<section class="copertina">
+  <div class="intestazione">
+    <img src="<%= @report.resource_url('logo_completo.png') %>" alt="">
+    <div><strong>Scuola dell'Infanzia Santa Maria Goretti</strong><span>Creola di Saccolongo (PD) · scuola paritaria parrocchiale</span></div>
+  </div>
+
+  <div class="copertina-corpo">
+    <div class="occhiello">DOCUMENTO INTERNO</div>
+    <div class="titolo-copertina">Report dei post</div>
+    <div class="sottotitolo-copertina">Pagina Facebook della scuola: pubblicazioni, programmazione e bozze in preparazione</div>
+
+    <table class="dati">
+      <tr><th>Situazione al</th><td><%= l(@report.generated_at, format: :long) %></td></tr>
+      <tr><th>Post inclusi</th><td><%= pluralize(@report.total, "post", plural: "post") %>, in ordine di data di pubblicazione</td></tr>
+      <% if dated.any? %>
+        <tr><th>Periodo</th><td>dal <%= l(dated.first.publish_at.to_date, format: :long) %> al <%= l(dated.last.publish_at.to_date, format: :long) %><%= " · #{pluralize(@report.total - dated.size, 'post', plural: 'post')} ancora senza data" if dated.size < @report.total %></td></tr>
+      <% end %>
+      <tr><th>Filtri</th><td><%= @report.filters.any? ? @report.filters.join(" · ") : "nessuno: tutti i post presenti nell'applicazione" %></td></tr>
+    </table>
+
+    <div class="riepilogo">
+      <div style="--c: var(--pubblicato)"><strong><%= @report.count("published") %></strong><span>pubblicati</span></div>
+      <div style="--c: var(--programmato)"><strong><%= @report.count("scheduled") %></strong><span>programmati</span></div>
+      <div style="--c: var(--bozza)"><strong><%= @report.count("draft") %></strong><span>in bozza</span></div>
+      <div style="--c: var(--avviso)"><strong><%= @report.provisional_count %></strong><span>da completare</span></div>
+    </div>
+  </div>
+
+  <div class="firma">
+    Documento generato con <strong>TinyTales</strong>, applicazione software sviluppata interamente da <strong>Michele Battistelli</strong>
+    per gestire in maniera facile e veloce i contenuti del sito web della scuola e la pubblicazione dei post sulle pagine social.
+  </div>
+</section>
+
+<%# ---------- premessa ---------- %>
+<section class="premessa nuova-pagina" id="premessa">
+  <h1>Premessa</h1>
+  <hr class="regola">
+
+  <div class="capitolo">NATURA DEL DOCUMENTO</div>
+  <p>Questo report raccoglie i post della pagina Facebook della Scuola dell'Infanzia Santa Maria Goretti di Creola: quelli
+     <strong>già pubblicati</strong>, quelli <strong>programmati</strong>, che usciranno da soli alla data stabilita, e quelli ancora
+     <strong>in bozza</strong>. È un documento interno, generato automaticamente, che fotografa la situazione al
+     <%= l(@report.generated_at, format: :long) %>.</p>
+
+  <div class="capitolo">FINALITÀ DELLE PUBBLICAZIONI</div>
+  <p>Lo scopo è garantire post e contenuti <strong>frequenti e costanti, quasi uno al giorno</strong>, per:</p>
+  <ul>
+    <li><strong>informare</strong> chi già ci conosce su quanto di bello viene fatto a scuola;</li>
+    <li><strong>incuriosire</strong> chi si avvicina alla nostra realtà ma non è ancora dei nostri;</li>
+    <li>soprattutto, <strong>dare visibilità pubblica</strong> al fatto che la scuola c'è, esiste, è una realtà viva e vegeta e fa tantissime cose.</li>
+  </ul>
+  <div class="evidenza">
+    <p>La visibilità delle attività mira a offrire alle famiglie tanti elementi per conoscere la nostra proposta e
+       <strong>tanti motivi validi per scegliere la nostra scuola</strong> piuttosto che altre: informazione e marketing insieme.
+       La costanza delle pubblicazioni fa crescere follower e interazioni, e con loro la visibilità della pagina.</p>
+  </div>
+
+  <div class="capitolo">CONTENUTI DEI POST</div>
+  <p>I post sono anzitutto <strong>informativi</strong>: raccontano la proposta didattica, le attività fatte a scuola e la scuola stessa
+     (proposta educativa, ambienti, orari, calendario e tutto ciò che può interessare chi già ci segue e chi ancora non ci conosce).
+     Accanto a questi ci sono i post che <strong>promuovono le nostre iniziative</strong>, specialmente quelle aperte anche agli esterni:
+     open day, giornate aperte, merende aperte, attività di autofinanziamento, gite scolastiche e così via.</p>
+
+  <div class="capitolo">UNA PROGRAMMAZIONE IN EVOLUZIONE</div>
+  <p>L'elenco dei post e la programmazione dei prossimi mesi <strong>cambieranno certamente</strong>, in base alle iniziative e agli eventi
+     che la direzione della scuola deciderà e programmerà in corso d'opera e che andranno fatti conoscere sui vari canali di comunicazione.
+     Gli <strong>avvisi sul sito web</strong> della scuola vengono pubblicati automaticamente ogni volta che ci sono nuovi eventi proposti
+     e confermati definitivamente dalla direzione e non ancora presenti sul sito.</p>
+
+  <div class="capitolo">LO STRUMENTO</div>
+  <p>Post, programmazione e report sono gestiti con <strong>TinyTales</strong>, applicazione software sviluppata interamente da
+     <strong>Michele Battistelli</strong> per gestire in maniera facile e veloce i contenuti del sito web della scuola e la pubblicazione
+     dei post sulle pagine social.</p>
+
+  <div class="capitolo">COME LEGGERE IL DOCUMENTO</div>
+  <p>Dopo questa premessa c'è un <strong>indice</strong> di tutti i post in ordine di data di pubblicazione, dal più vecchio al più recente
+     (le bozze ancora senza data sono in fondo), con stato e data di ciascuno: un clic sul titolo porta alla sua scheda, e i post si trovano
+     anche nei segnalibri del lettore PDF. Ogni post occupa <strong>una pagina</strong>, con titolo, stato, data e ora di pubblicazione,
+     testo, immagini e video allegati e, per i post non ancora usciti, che cosa manca o va confermato; nel testo le parti
+     da completare sono <mark>evidenziate</mark>.</p>
+</section>
+
+<%# ---------- indice ---------- %>
+<section class="nuova-pagina" id="indice">
+  <h1>Indice</h1>
+  <hr class="regola">
+  <div class="legenda">
+    <span><span class="stato stato-published">Pubblicato</span> già uscito</span>
+    <span><span class="stato stato-scheduled">Programmato</span> uscirà da solo alla data indicata</span>
+    <span><span class="stato stato-draft">Bozza</span> in preparazione, data provvisoria</span>
+    <span><strong style="color: var(--avviso)">⚠ da completare</strong> manca qualcosa</span>
+  </div>
+  <table class="indice">
+    <tr><td class="num"></td><td colspan="4" class="titolo"><a href="#premessa">Premessa</a></td><td class="pag"><a href="#premessa"><%= page_of.("premessa") %></a></td></tr>
+    <% cards.chunk_while { |a, b| @report.month_label(a.post) == @report.month_label(b.post) }.each do |month| %>
+      <tr class="mese"><td colspan="6"><%= @report.month_label(month.first.post) %></td></tr>
+      <% month.each do |card| %>
+        <tr>
+          <td class="num"><%= card.number %></td>
+          <td class="quando"><%= @report.short_date(card.post) %></td>
+          <td class="col-stato"><span class="stato stato-<%= card.post.status %>"><%= status_label(card.post.status) %></span></td>
+          <td class="titolo"><a href="#<%= card.anchor %>"><%= card.post.title %></a></td>
+          <td class="segno"><%= "⚠ da completare" if card.provisional? %></td>
+          <td class="pag"><a href="#<%= card.anchor %>"><%= page_of.(card.anchor) %></a></td>
+        </tr>
+      <% end %>
+    <% end %>
+  </table>
+</section>
+
+<%# ---------- una pagina per post ---------- %>
+<% cards.each do |card| %>
+  <% post = card.post %>
+  <% missing = card.checks + (card.note_state&.dig(:provisional) ? [ "Stato indicato nelle note: #{card.note_state[:text]}" ] : []) + card.note_points %>
+  <section class="scheda" id="<%= card.anchor %>">
+    <div class="scheda-testa">
+      <div>
+        <div class="scheda-num">Scheda <%= card.number %> di <%= @report.total %></div>
+        <h2><%= post.title %></h2>
+      </div>
+      <div class="quando-scheda <%= 'provvisoria' if post.draft? %>">
+        <span class="stato stato-<%= post.status %>"><%= status_label(post.status) %></span>
+        <% if post.publish_at %>
+          <span class="data"><%= l(post.publish_at.to_date, format: :long) %></span>
+          <span class="ora">ore <%= l(post.publish_at, format: "%H.%M") %><%= " · data provvisoria" if post.draft? %></span>
+        <% else %>
+          <span class="data">Data da definire</span>
+        <% end %>
+      </div>
+    </div>
+    <div class="scheda-meta">
+      <span>Pagine: <%= post.social_pages.map(&:platform_label).uniq.join(", ").presence || "nessuna" %></span>
+      <span>Allegati: <%= card.files.size %></span>
+      <% @report.facebook_links(post).each do |url| %><span>Su Facebook: <a href="<%= url %>"><%= url.delete_prefix("https://www.") %></a></span><% end %>
+    </div>
+
+    <% if missing.any? %>
+      <div class="mancanze <%= 'poche' if missing.size <= 3 %>">
+        <strong><%= post.published? ? "⚠ DA CONTROLLARE" : "⚠ DA COMPLETARE" %></strong>
+        <ul>
+          <% missing.first(8).each do |item| %><li><%= item %></li><% end %>
+          <% if missing.size > 8 %><li>… e altri <%= missing.size - 8 %> punti (vedi le note nell'app)</li><% end %>
+        </ul>
+      </div>
+    <% elsif !post.published? %>
+      <div class="pronto">✓ Pronto: testo, allegati e data ci sono, niente da completare.</div>
+    <% end %>
+
+    <div class="corpo">
+      <div class="colonna">
+        <div class="etichetta">TESTO DEL POST</div>
+        <% if post.body.present? %>
+          <div class="testo"><%= @report.body_html(post) %></div>
+        <% else %>
+          <div class="vuoto">Testo non ancora scritto</div>
+        <% end %>
+      </div>
+      <div class="colonna colonna-allegati">
+        <div class="etichetta">ALLEGATI<%= " (#{card.files.size})" if card.files.any? %></div>
+        <% if card.files.any? %>
+          <% shown = card.files.size > PostsReport::MAX_FILES_SHOWN ? card.files.first(PostsReport::MAX_FILES_SHOWN - 1) : card.files %>
+          <div class="allegati n<%= [ card.files.size, PostsReport::MAX_FILES_SHOWN ].min %>">
+            <% shown.each do |file| %>
+              <div class="allegato <%= 'provvisoria' if file.placeholder %>">
+                <div class="anteprima">
+                  <% if file.preview %>
+                    <img src="<%= file.preview %>" alt="">
+                    <% if file.kind == "video" %><span class="tipo">▶ VIDEO</span><% end %>
+                  <% else %>
+                    <span class="manca-anteprima"><%= file.kind == "video" ? "Video" : "Immagine" %>: anteprima non disponibile</span>
+                  <% end %>
+                </div>
+                <div class="didascalia"><%= file.position %>. <%= file.name %><%= " · provvisoria" if file.placeholder %> · <%= file.detail %></div>
+              </div>
+            <% end %>
+            <% if card.files.size > shown.size %>
+              <div class="allegato altri">+ altri <%= card.files.size - shown.size %> allegati</div>
+            <% end %>
+          </div>
+        <% else %>
+          <div class="vuoto">Nessuna immagine o video</div>
+        <% end %>
+      </div>
+    </div>
+  </section>
+<% end %>
+
+<script>
+  // Ogni scheda sta in una pagina. Si sistema a immagini caricate (Chrome stampa dopo l'evento «load»):
+  // - testo lungo: il carattere si riduce quanto basta (fino a 7 pt), poi il testo viene troncato con un avviso;
+  // - allegati: se non entrano nella colonna, si abbassa l'altezza massima delle immagini, che restano proporzionate.
+  const overflows = (element) => element.scrollHeight > element.clientHeight + 1
+
+  function fitText(box) {
+    let size = 9.5
+    while (overflows(box) && size > 7) {
+      size -= 0.25
+      box.style.fontSize = `${size}pt`
+      box.style.lineHeight = size < 8.5 ? "1.35" : "1.45"
+    }
+    if (overflows(box)) box.classList.add("tagliato")
+  }
+
+  function fitAttachments(column) {
+    const images = [...column.querySelectorAll(".allegato img")]
+    let height = column.clientHeight
+    while (overflows(column) && height > 25) {
+      height *= 0.93
+      images.forEach((img) => { img.style.maxHeight = `${height}px` })
+    }
+  }
+
+  window.addEventListener("load", () => {
+    document.querySelectorAll(".scheda .testo").forEach(fitText)
+    document.querySelectorAll(".scheda .colonna-allegati").forEach(fitAttachments)
+  })
+</script>
+</body>
+</html>

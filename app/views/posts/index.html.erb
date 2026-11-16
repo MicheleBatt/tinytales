@@ -21,6 +21,9 @@
     </button>
     <%= link_to "♪ Musicoteca", music_tracks_path, class: "bottone bottone-secondario",
                 title: "I brani che Claude può usare come sottofondo dei video" %>
+    <%= link_to "⤓ Esporta PDF", report_posts_path(q: report_filters), class: "bottone bottone-secondario bottone-esporta",
+                title: "Il report in PDF dei post, con i filtri impostati qui sotto",
+                data: { controller: "report-export", action: "report-export#download", turbo: false } %>
     <%= link_to "Nuovo post", new_post_path, class: "bottone bottone-principale" %>
   </div>
 </div>

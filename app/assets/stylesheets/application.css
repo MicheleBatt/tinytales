@@ -628,10 +628,6 @@ textarea.testo-post { resize: vertical; min-height: 320px; line-height: 1.5; }
 .bottone-freccia:hover { border-color: var(--blu); color: var(--blu); }
 .galleria .da-rimuovere img, .galleria .da-rimuovere video { opacity: 0.3; filter: grayscale(1); }
 .galleria .da-rimuovere figcaption span { text-decoration: line-through; }
-.galleria-nuovi:empty { display: none; }
-.galleria-nuovi { margin-top: 10px; }
-.galleria .nuovo img { outline: 2px solid var(--verde); outline-offset: -2px; }
-.segnaposto-video { aspect-ratio: 1; border-radius: 4px; background: var(--blu-chiaro); color: var(--blu); display: grid; place-items: center; font-size: 13px; font-weight: 500; }
 .bottone-piccolo { font: inherit; font-size: 12px; color: var(--rosso); background: none; border: 1px solid #EBC1BC; border-radius: 4px; padding: 1px 7px; cursor: pointer; }
 .bottone-piccolo:hover { background: var(--rosso-chiaro); }
 .caricamento { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 12px; }

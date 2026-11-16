@@ -3,6 +3,8 @@ Rails.application.routes.draw do
 
   root "posts#index"
   resources :posts do
+    # «Esporta PDF» dall'elenco: il report dei post filtrati, da scaricare.
+    get :report, path: "report", on: :collection
     member do
       patch :publish
       patch :schedule

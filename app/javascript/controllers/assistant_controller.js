@@ -403,8 +403,8 @@ export default class extends Controller {
     const form = this.postForm()
     if (!form) return {}
     const value = (selector) => form.querySelector(selector)?.value ?? ""
-    const kept = [...form.querySelectorAll(".galleria-ordinabile figure:not(.da-rimuovere) figcaption > span:first-child")].map((s) => s.textContent.trim())
-    const input = form.querySelector("input[type=file][name='post[media][]']")
+    const name = (figure) => figure.querySelector("figcaption > span:first-child").textContent.trim()
+    const figures = [...form.querySelectorAll(".galleria-ordinabile figure:not(.da-rimuovere)")]
     return {
       title: value(FIELDS.titolo.selector),
       body: value(FIELDS.testo.selector),
@@ -412,8 +412,9 @@ export default class extends Controller {
       publish_at: value(FIELDS.data.selector),
       status: form.querySelector(".stato-fisso .pill")?.textContent.trim(),
       pages: [...form.querySelectorAll("input[name='post[social_page_ids][]']:checked")].map((c) => c.closest("label")?.title || c.value),
-      media: kept,
-      new_files: input ? [...input.files].map((f) => f.name) : []
+      // Nell'ordine della galleria; i file nuovi, non ancora salvati, anche a parte.
+      media: figures.map((figure) => name(figure) + ("nuovo" in figure.dataset ? " (nuovo, da salvare)" : "")),
+      new_files: figures.filter((figure) => "nuovo" in figure.dataset).map(name)
     }
   }
 
@@ -608,14 +609,11 @@ export default class extends Controller {
         const response = await fetch(box.dataset.url)
         if (!response.ok) throw new Error("il file non si trova più nella cartella di lavoro di Claude")
         const blob = await response.blob()
-        const input = form.querySelector("input[type=file][name='post[media][]']")
-        const transfer = new DataTransfer()
-        ;[...input.files].forEach((f) => transfer.items.add(f))
-        transfer.items.add(new File([blob], box.dataset.name, { type: blob.type }))
-        input.files = transfer.files
-        input.dispatchEvent(new Event("input", { bubbles: true }))
-        input.dispatchEvent(new Event("change", { bubbles: true }))
-        this.highlight(form.querySelector(".galleria-nuovi") || input, scroll)
+        // Il file entra nella galleria del post come gli altri: spostabile, removibile, da guardare a tutto schermo.
+        const editor = this.application.getControllerForElementAndIdentifier(form, "media-editor")
+        if (!editor) throw new Error("la galleria del post non è pronta")
+        const figure = editor.addFile(new File([blob], box.dataset.name, { type: blob.type }))
+        this.highlight(figure, scroll)
       } else {
         const field = form.querySelector(FIELDS[kind].selector)
         field.value = kind === "data" ? content.trim().slice(0, 16) : content

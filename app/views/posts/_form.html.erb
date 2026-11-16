@@ -1,5 +1,5 @@
 <%# Salvare un post già programmato o pubblicato aggiorna anche i social: intanto un velo con lo spinner. %>
-<%= form_with model: post, class: "modulo",
+<%= form_with model: post, class: "modulo", multipart: true,
               data: { controller: "media-editor",
                       busy_message: (post.persisted? && !post.draft? ? "Salvataggio e aggiornamento #{social_pages_phrase(post)} in corso…" : nil) } do |f| %>
   <%= hidden_field_tag :assistant_token, @assistant_token, id: nil %>
@@ -73,10 +73,11 @@
 
   <section class="riquadro">
     <h2>Immagini e video, nell'ordine di caricamento</h2>
-    <% if post.media.any?(&:persisted?) %>
-      <p class="aiuto">Trascina le miniature per cambiare l'ordine, oppure usa le frecce ← →.</p>
-    <% end %>
+    <p class="aiuto" data-media-editor-target="hint" <%= "hidden" unless post.media.any?(&:persisted?) %>>
+      Trascina le miniature per cambiare l'ordine, oppure usa le frecce ← →.</p>
     <%= field_error(post, :media) %>
+    <%# Sempre presente: se si tolgono tutti i file, arriva comunque l'elenco (vuoto) di quelli da tenere. %>
+    <%= hidden_field_tag "post[media][]", "", id: nil %>
 
     <div class="galleria galleria-ordinabile" data-media-editor-target="list"
          data-action="dragover->media-editor#dragOver drop->media-editor#drop">
@@ -108,13 +109,13 @@
       <% end %>
     </div>
 
+    <%# Il campo serve solo a scegliere: ogni file scelto diventa una miniatura della galleria, con il suo campo. %>
     <div class="caricamento">
-      <%= f.label :media, "Aggiungi immagini o video" %>
-      <%= f.file_field :media, multiple: true, accept: "image/*,video/*",
-                       data: { action: "media-editor#preview", media_editor_target: "input" } %>
-      <span class="aiuto">I nuovi file si aggiungono dopo quelli già presenti.</span>
+      <label for="aggiungi-file">Aggiungi immagini o video</label>
+      <input type="file" id="aggiungi-file" multiple accept="image/*,video/*"
+             data-action="change->media-editor#addChosen" data-media-editor-target="input">
+      <span class="aiuto">I nuovi file si aggiungono in fondo: poi puoi spostarli, guardarli e toglierli come gli altri.</span>
     </div>
-    <div class="galleria galleria-nuovi" data-media-editor-target="previews"></div>
   </section>
 
   <div class="barra-azioni">

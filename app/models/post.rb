@@ -92,13 +92,15 @@ class Post < ApplicationRecord
 
   private
 
+  # L'ordine è quello in cui i file sono stati assegnati: file già salvati (id firmati) e caricamenti nuovi,
+  # mescolati come li ha messi la persona. Active Storage tiene i blob nello stesso ordine.
   def store_media_order
-    attachables = @media_assigned_order
     @media_assigned_order = nil
 
-    kept = attachables.grep(String).filter_map { |signed_id| ActiveStorage::Blob.find_signed(signed_id)&.id }
+    changes = attachment_changes["media"]
+    assigned = changes.respond_to?(:blobs) ? changes.blobs.filter_map(&:id) : []
     current = media_attachments.reload.sort_by(&:id).map(&:blob_id)
-    update_column(:media_order, (kept & current) + (current - kept))
+    update_column(:media_order, (assigned & current) + (current - assigned))
   end
 
   def scheduled_time_in_future

@@ -7,6 +7,8 @@
 // del calendario, il popup si chiude; e se la richiesta non arriva (rete, errore del server) il velo
 // mostra l'errore invece di sparire. Gli errori di Facebook arrivano invece con la pagina nuova,
 // in una finestra a sé (shared/_errore_popup).
+//
+// Le stesse funzioni si usano anche da altri script (per esempio «Esporta PDF»): showBusy, showBusyError, hideBusy.
 const SLOW_AFTER = 20_000
 const WAIT_TEXT = "Di solito bastano pochi secondi: non chiudere la pagina."
 
@@ -31,11 +33,13 @@ function build() {
   return overlay
 }
 
-function show(message) {
+const SLOW_TEXT = "Ci sta mettendo più del solito: aspetta ancora un momento, la risposta di Facebook è in arrivo."
+
+function show(message, { wait = WAIT_TEXT, slow = SLOW_TEXT } = {}) {
   const box = overlay?.isConnected ? overlay : build()
   box.classList.remove("attesa-lenta", "attesa-errore")
   box.querySelector(".attesa-messaggio").textContent = message
-  box.querySelector(".attesa-sotto").textContent = WAIT_TEXT
+  box.querySelector(".attesa-sotto").textContent = wait
   box.querySelector(".attesa-chiudi").hidden = true
   document.body.append(box)
   if (!box.open) box.showModal()
@@ -43,17 +47,18 @@ function show(message) {
   clearTimeout(slowTimer)
   slowTimer = setTimeout(() => {
     box.classList.add("attesa-lenta")
-    box.querySelector(".attesa-sotto").textContent = "Ci sta mettendo più del solito: aspetta ancora un momento, la risposta di Facebook è in arrivo."
+    box.querySelector(".attesa-sotto").textContent = slow
   }, SLOW_AFTER)
 }
 
-function showError(text) {
+function showError(text, title = "L'azione non è riuscita") {
   clearTimeout(slowTimer)
   document.body.removeAttribute("aria-busy")
-  const box = overlay
+  const box = overlay?.isConnected ? overlay : build()
+  if (!box.isConnected) { document.body.append(box); box.showModal() }
   box.classList.remove("attesa-lenta")
   box.classList.add("attesa-errore")
-  box.querySelector(".attesa-messaggio").textContent = "L'azione non è riuscita"
+  box.querySelector(".attesa-messaggio").textContent = title
   box.querySelector(".attesa-sotto").textContent = text
   const close = box.querySelector(".attesa-chiudi")
   close.hidden = false
@@ -95,3 +100,5 @@ document.addEventListener("turbo:submit-end", (event) => {
 document.addEventListener("turbo:load", hide)
 // Il velo non deve finire nella copia della pagina che Turbo conserva per il tasto «indietro».
 document.addEventListener("turbo:before-cache", hide)
+
+export { show as showBusy, showError as showBusyError, hide as hideBusy }
