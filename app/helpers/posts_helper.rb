@@ -88,11 +88,6 @@ module PostsHelper
       lightbox_download: rails_blob_path(file, disposition: "attachment") }
   end
 
-  # I filtri dell'elenco da passare a «Esporta PDF», così il report contiene gli stessi post.
-  def report_filters
-    params.fetch(:q, {}).permit(*PostsController::SEARCH_FIELDS).to_h.compact_blank.presence
-  end
-
   # I file che iniziano con PROVVISORIA_ sono segnaposto da sostituire.
   def placeholder?(attachment)
     attachment.filename.to_s.start_with?("PROVVISORIA_")

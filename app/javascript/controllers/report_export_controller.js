@@ -1,9 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 import { showBusy, showBusyError, hideBusy } from "busy_overlay"
 
-// «Esporta PDF» nell'elenco dei post: chiede il report con i filtri attuali (già nell'indirizzo del link),
-// copre la pagina con il velo d'attesa mentre il server lo prepara e, quando è pronto, lo scarica da solo.
+// «Esporta PDF» nell'elenco dei post: come «Filtra» invia il form dei filtri così come è compilato ora, anche
+// se non è stato applicato, ma chiede il risultato in PDF. Copre la pagina con il velo d'attesa mentre il
+// server lo prepara e, quando è pronto, lo scarica da solo.
 export default class extends Controller {
+  static values = { url: String }
+
   async download(event) {
     event.preventDefault()
     if (this.busy) return
@@ -14,7 +17,7 @@ export default class extends Controller {
       slow: "Ci sta mettendo più del solito: con tanti post e tante foto serve qualche secondo in più."
     })
     try {
-      const response = await fetch(this.element.href, { headers: { Accept: "application/pdf" } })
+      const response = await fetch(this.reportUrl(), { headers: { Accept: "application/pdf" } })
       if (!response.ok) {
         const detail = await response.json().then((json) => json.error).catch(() => null)
         throw new Error(detail || `il server ha risposto con l'errore ${response.status}.`)
@@ -31,6 +34,13 @@ export default class extends Controller {
     } finally {
       this.busy = false
     }
+  }
+
+  // L'indirizzo del report con i valori attuali del form (solo i filtri compilati).
+  reportUrl() {
+    const filters = [ ...new FormData(this.element.form) ].filter(([ name, value ]) => name.startsWith("q[") && value !== "")
+    const query = new URLSearchParams(filters).toString()
+    return query ? `${this.urlValue}?${query}` : this.urlValue
   }
 
   filename(response) {

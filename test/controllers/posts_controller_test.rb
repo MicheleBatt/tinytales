@@ -48,6 +48,7 @@ class PostsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "la vista a calendario mostra il mese con i post nei loro giorni, colorati per stato" do
+    travel_to Time.zone.local(2026, 11, 16, 10, 0) # prima del post programmato del 18, che poi passerebbe a pubblicato
     get posts_path, params: { vista: "calendario", mese: "2026-11" }
     assert_response :success
     assert_select ".calendario-mese", "Novembre 2026"

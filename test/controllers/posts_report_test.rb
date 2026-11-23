@@ -16,16 +16,18 @@ class PostsReportControllerTest < ActionDispatch::IntegrationTest
     PostsReport.text_of = nil
   end
 
-  test "l'homepage ha «Esporta PDF» a destra della musicoteca, con i filtri attivi" do
+  test "l'homepage ha «Esporta PDF» a destra della musicoteca, collegato al form dei filtri" do
     get root_path
-    buttons = css_select(".azioni-testa a.bottone").map { |a| a.text.strip }
+    buttons = css_select(".azioni-testa .bottone").map { |b| b.text.strip }
     assert_equal buttons.index("♪ Musicoteca") + 1, buttons.index("⤓ Esporta PDF")
-    assert_select "a.bottone-esporta[href=?][data-controller=report-export][data-action='report-export#download']", report_posts_path
+    assert_select "button.bottone-esporta[type=button][form=filtri-post][data-controller=report-export]" \
+                  "[data-action='report-export#download'][data-report-export-url-value=?]", report_posts_path
+    assert_select "form#filtri-post input[type=submit][value=Filtra]"
+  end
 
-    get posts_path, params: { q: { status_eq: "draft", title_or_body_or_notes_cont: "Natale", s: "publish_at asc", ignoto: "x" } }
-    href = css_select("a.bottone-esporta").first["href"]
-    assert_equal({ "status_eq" => "draft", "title_or_body_or_notes_cont" => "Natale", "s" => "publish_at asc" },
-                 Rack::Utils.parse_nested_query(URI(href).query)["q"])
+  test "un post senza allegati lo dice nella sua pagina del report" do
+    get report_posts_path
+    assert_includes @printed.last, "Nessuna immagine o video al momento allegati"
   end
 
   test "il report si scarica come PDF, con tutti i post" do
