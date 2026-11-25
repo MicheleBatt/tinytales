@@ -15,6 +15,9 @@ class SocialPage < ApplicationRecord
 
   def connected? = external_id.present? && access_token.present?
 
+  # Il freno sulle statistiche: vicino ai limiti di chiamate del social, per un po' non si chiedono.
+  def metrics_paused?(now = Time.current) = metrics_paused_until.present? && metrics_paused_until > now
+
   validates :name, :url, presence: true
   validates :url, uniqueness: true
   validates :platform, inclusion: { in: PLATFORMS.keys }

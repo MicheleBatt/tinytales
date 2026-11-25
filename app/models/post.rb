@@ -27,6 +27,28 @@ class Post < ApplicationRecord
   # In PostgreSQL i post senza data vengono per primi, come bozze ancora da collocare.
   scope :newest_first, -> { order(publish_at: :desc, id: :desc) }
 
+  # Ordinamento per statistiche («Ordine» nei filtri: s=views desc, s=reach asc…). Ransack, se l'ordinamento non è
+  # una colonna, usa lo scope sort_by_<nome>_<verso>. Conta il totale all'ultima lettura, sommato sui social, come nelle
+  # pagine; i post non pubblicati o senza letture vanno in fondo in entrambi i versi.
+  STATS_TOTALS_JOIN = <<~SQL.squish
+    LEFT JOIN (
+      SELECT publications.post_id, SUM(latest.total_views) AS views, SUM(latest.total_reach) AS reach
+      FROM (SELECT DISTINCT ON (publication_id) publication_id, total_views, total_reach
+            FROM publication_metrics ORDER BY publication_id, measured_on DESC) latest
+      JOIN publications ON publications.id = latest.publication_id
+      GROUP BY publications.post_id
+    ) post_totals ON post_totals.post_id = posts.id AND posts.status = 'published'
+  SQL
+
+  %w[views reach].each do |field|
+    %w[asc desc].each do |dir|
+      scope :"sort_by_#{field}_#{dir}", lambda {
+        joins(STATS_TOTALS_JOIN).select("posts.*", "post_totals.#{field} AS stats_#{field}")
+                                .order(Arel.sql("stats_#{field} #{dir.upcase} NULLS LAST, posts.publish_at DESC NULLS LAST, posts.id DESC"))
+      }
+    end
+  end
+
   def self.ransackable_attributes(_auth_object = nil)
     %w[title body notes status publish_at created_at updated_at]
   end

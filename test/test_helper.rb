@@ -14,6 +14,7 @@ module ActiveSupport
     setup do
       @facebook = FakeFacebookClient.new
       SocialPublishers::Facebook.client_builder = ->(_page) { @facebook }
+      SocialMetrics::Facebook.client_builder = ->(_page) { @facebook }
     end
   end
 end

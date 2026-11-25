@@ -5,6 +5,8 @@ Rails.application.routes.draw do
   resources :posts do
     # «Esporta PDF» dall'elenco: il report dei post filtrati, da scaricare.
     get :report, path: "report", on: :collection
+    # Visualizzazioni e persone raggiunte aggiornate dai social, chieste dal browser dopo il caricamento (Turbo Stream).
+    get :stats, path: "statistiche", on: :collection, as: :statistiche
     member do
       patch :publish
       patch :schedule

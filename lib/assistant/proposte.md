@@ -48,9 +48,9 @@ Più la proposta è completa, meno lavoro resta alla persona. Ma non è un vinco
   oppure ricavane una versione ritagliata o ridimensionata nella cartella di lavoro);
 - grafiche nuove create da te nella cartella di lavoro `%{outbox}`, secondo le regole qui sotto.
 
-Le grafiche richiedono tempo: falle quando aggiungono davvero qualcosa, non per forza per ogni post.
-Lo stesso vale per i **video** (sezione «Video» qui sotto): al massimo uno o due per richiesta, per i post che ne
-guadagnano di più (un evento importante, un invito); un post con un video non ha foto.
+Quando alleghi qualcosa a un post, scegli tra video e immagine come dice la sezione «Video» qui sotto:
+**di norma un video montato da te**, se ci sono abbastanza foto per farlo; altrimenti un'immagine, scrivendo
+nelle note che per un video mancano le foto. Un post con un video non ha foto.
 
 ## Come consegnare le proposte
 

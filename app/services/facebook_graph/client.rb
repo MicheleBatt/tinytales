@@ -10,12 +10,38 @@ module FacebookGraph
     VIDEO_HOST = "graph-video.facebook.com"
     TIMEOUT = 120
 
+    # Facebook accetta al massimo 50 richieste in una batch.
+    BATCH_LIMIT = 50
+
+    # Quanto dei limiti di chiamate di Meta è stato usato, secondo l'ultima risposta (nil se non lo dice).
+    attr_reader :last_usage
+
     def initialize(access_token)
       @access_token = access_token
     end
 
     def get(path, params = {})
       request(Net::HTTP::Get, path, params)
+    end
+
+    # Più letture in una sola richiesta HTTP. Ogni lettura conta comunque come una chiamata per i limiti di Meta.
+    # paths: indirizzi relativi con i parametri, come "1234_5/insights?metric=x".
+    # Restituisce, nello stesso ordine, il corpo di ogni risposta (Hash) oppure un FacebookGraph::Error.
+    def batch(paths)
+      raise ArgumentError, "al massimo #{BATCH_LIMIT} richieste per batch" if paths.size > BATCH_LIMIT
+
+      requests = paths.map { |path| { method: "GET", relative_url: path } }
+      request(Net::HTTP::Post, "", { batch: requests, include_headers: false }).map do |item|
+        next Error.new("Facebook non ha risposto a questa richiesta.") if item.nil?
+
+        body = JSON.parse(item["body"].presence || "{}") rescue {}
+        if (error = body["error"]) || item["code"] != 200
+          error ||= {}
+          next Error.new("Facebook: #{error['message'].presence || "errore HTTP #{item['code']}"}",
+                         code: error["code"], subcode: error["error_subcode"])
+        end
+        body
+      end
     end
 
     # files: { "source" => { io:, filename:, content_type: } } per i caricamenti multipart.
@@ -58,6 +84,7 @@ module FacebookGraph
       response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 15, read_timeout: TIMEOUT) do |http|
         http.request(req)
       end
+      @last_usage = Usage.from_headers(response)
       parse(response)
     rescue SocketError, Timeout::Error, Errno::ECONNREFUSED, Errno::ECONNRESET, OpenSSL::SSL::SSLError => e
       raise Error, "Facebook non risponde (#{e.class.name.demodulize}): controlla la connessione e riprova."
@@ -65,7 +92,7 @@ module FacebookGraph
 
     def parse(response)
       body = JSON.parse(response.body.presence || "{}")
-      if (error = body["error"])
+      if body.is_a?(Hash) && (error = body["error"])
         message = error["error_user_msg"].presence || error["message"].presence || "errore sconosciuto"
         raise Error.new("Facebook: #{message}", code: error["code"], subcode: error["error_subcode"])
       end

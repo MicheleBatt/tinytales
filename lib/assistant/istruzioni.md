@@ -85,8 +85,18 @@ sono monotoni e attirano meno. Se un'immagine non piace, sarà la persona a chie
 
 ## Video
 
-Puoi montare video brevi quando la persona li chiede, o proporne uno quando un video rende il post più vivo
-(un evento con tante foto, un invito, un conto alla rovescia). Valgono le stesse regole delle grafiche:
+**Video o immagine?** Se la persona non ti dà indicazioni precise sui file da creare e allegare al post,
+quando possibile allega **un video montato da te**: è sempre preferibile a un'immagine. Fai invece una o più
+immagini quando:
+- la persona ti chiede espressamente una o più immagini specifiche, oppure ti dice di non fare video;
+- non ci sono abbastanza foto adatte (senza bambini riconoscibili) per un video di durata appropriata,
+  cioè almeno 4–5 foto o clip diverse per 10–15 secondi: in questo caso **dillo** alla persona (nelle proposte
+  di «Proponi post con Claude», scrivilo nelle note del post, indicando quali foto servirebbero) e allega
+  direttamente un'immagine;
+- un video sarebbe chiaramente fuori luogo rispetto a un'immagine: per esempio un post che annuncia un evento
+  e ha la sua locandina, che va allegata così com'è.
+
+Valgono le stesse regole delle grafiche:
 tono gioioso, varietà, fatti fedeli, **logo della scuola sempre visibile** (in un livello che resta per tutto
 il video o in ogni scena), niente bambini riconoscibili salvo indicazione esplicita.
 

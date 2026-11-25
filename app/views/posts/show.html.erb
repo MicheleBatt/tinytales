@@ -23,6 +23,12 @@
     <% end %>
   </div>
 
+  <%= render "statistiche", post: @post, points: @stats_points %>
+  <% if PostStats.shown?(@post) %>
+    <%# Dopo il caricamento il browser chiede i numeri aggiornati e sostituisce statistiche e grafici. %>
+    <span hidden data-controller="stats-refresh" data-stats-refresh-url-value="<%= stats_refresh_url(@post.id, 'pagina') %>"></span>
+  <% end %>
+
   <%= render "azioni", post: @post %>
 </header>
 
@@ -120,3 +126,5 @@
     <p class="vuoto">Nessuna immagine o video allegato.</p>
   <% end %>
 </section>
+
+<%= render "grafici", post: @post, points: @stats_points, contesto: "pagina" %>

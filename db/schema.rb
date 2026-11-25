@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_12_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_25_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -96,12 +96,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_100000) do
     t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'scheduled'::character varying, 'published'::character varying]::text[])", name: "posts_status_valid"
   end
 
+  create_table "publication_metrics", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "measured_at", null: false
+    t.date "measured_on", null: false
+    t.bigint "publication_id", null: false
+    t.string "remote_id", null: false
+    t.integer "total_reach", null: false
+    t.integer "total_views", null: false
+    t.datetime "updated_at", null: false
+    t.index ["publication_id", "measured_on"], name: "index_publication_metrics_on_publication_id_and_measured_on", unique: true
+  end
+
   create_table "publications", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "post_id", null: false
     t.string "remote_id"
     t.string "remote_kind"
     t.string "remote_media_ids", default: [], null: false, array: true
+    t.string "remote_post_id"
     t.bigint "social_page_id", null: false
     t.text "sync_error"
     t.datetime "synced_at"
@@ -117,6 +130,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_100000) do
     t.text "access_token"
     t.datetime "created_at", null: false
     t.string "external_id"
+    t.datetime "metrics_paused_until"
     t.string "name", null: false
     t.string "platform", null: false
     t.datetime "updated_at", null: false
@@ -128,6 +142,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_100000) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "assistant_conversations", "posts", on_delete: :cascade
   add_foreign_key "assistant_messages", "assistant_conversations", on_delete: :cascade
+  add_foreign_key "publication_metrics", "publications", on_delete: :cascade
   add_foreign_key "publications", "posts", on_delete: :cascade
   add_foreign_key "publications", "social_pages"
 end

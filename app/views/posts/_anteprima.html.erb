@@ -25,9 +25,14 @@
         <span class="nota-stato">nessuna pagina social collegata</span>
       <% end %>
     </div>
+    <% stats_points = local_assigns.fetch(:stats_points, []) %>
+    <%= render "posts/statistiche", post:, points: stats_points %>
+    <% if PostStats.shown?(post) %>
+      <span hidden data-controller="stats-refresh" data-stats-refresh-url-value="<%= stats_refresh_url(post.id, 'popup') %>"></span>
+    <% end %>
   </header>
 
-  <%= render "azioni", post:, return_to: %>
+  <%= render "azioni", post:, return_to:, inline_confirm: true %>
 
   <div class="anteprima-corpo">
     <% if post.media.any? %>
@@ -60,6 +65,8 @@
       </div>
     <% end %>
   </div>
+
+  <%= render "posts/grafici", post:, points: stats_points, contesto: "popup" %>
 
   <footer class="anteprima-piede">
     <%= link_to "Apri la pagina del post →", post_path(post), class: "anteprima-link" %>

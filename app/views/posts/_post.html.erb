@@ -42,4 +42,6 @@
   <span class="riga-pagine" role="cell">
     <% post.social_pages.each do |page| %><%= social_page_chip(page) %><% end %>
   </span>
+
+  <%= render "metriche_elenco", post:, totals: stats[post.id] %>
 <% end %>

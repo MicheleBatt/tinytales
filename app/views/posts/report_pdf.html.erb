@@ -131,6 +131,30 @@
   .allegato .didascalia { width: 0; min-width: 100%; font-size: 6.8pt; line-height: 1.3; color: var(--tenue); margin-top: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .allegato.provvisoria { border-color: var(--avviso); }
   .allegato.altri { color: var(--tenue); font-weight: 700; background: var(--fondo); padding: 2.5mm 3mm; }
+
+  /* ---------- statistiche dei post pubblicati ---------- */
+  .statistiche { display: flex; align-items: stretch; gap: 3mm; margin-top: 3mm; }
+  .statistica { display: flex; align-items: center; gap: 2.5mm; min-width: 52mm; padding: 2mm 4mm 2mm 2.5mm; border: .25mm solid var(--linea); border-radius: 1.5mm; }
+  .statistica-icona { display: flex; align-items: center; justify-content: center; width: 8mm; height: 8mm; border-radius: 50%;
+                      background: var(--programmato-fondo); color: #2456A6; }
+  .statistica-icona .icona-statistica { width: 4.2mm; height: 4.2mm; }
+  .statistica .etichetta { margin-bottom: .6mm; }
+  .statistica strong { display: block; font: 700 15pt/1.05 var(--sans); }
+  .statistica .variazione { font-size: 7.5pt; color: var(--tenue); }
+  .statistica .variazione b { color: var(--pubblicato); }
+  .statistiche .nota { align-self: center; margin-left: auto; font-size: 7.6pt; line-height: 1.45; color: var(--tenue); text-align: right; }
+  .icona-statistica { width: 3.4mm; height: 3.4mm; }
+  /* I grafici in fondo alla pagina, ognuno nel suo riquadro: il testo e gli allegati si adattano allo spazio che resta. */
+  .grafici { flex: 0 0 auto; margin-top: 4mm; }
+  .grafici-testa { display: flex; justify-content: space-between; align-items: baseline; }
+  .grafici-testa .periodo { font-size: 7.5pt; color: var(--tenue); }
+  .grafici-coppia { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4mm; }
+  .grafico { margin: 0; min-width: 0; padding: 2.5mm 3mm 1.5mm; border: .25mm solid var(--linea); border-radius: 1.5mm; }
+  .grafico figcaption { display: flex; align-items: center; gap: 1.5mm; font-size: 8pt; font-weight: 700; margin-bottom: 1.5mm; }
+  .grafico-icona { display: flex; align-items: center; justify-content: center; width: 5.5mm; height: 5.5mm; border-radius: 50%;
+                   background: var(--programmato-fondo); color: #2456A6; }
+  .grafico svg { display: block; height: auto; }
+  .grafici .nota { font-size: 7.5pt; color: var(--tenue); margin: 1.5mm 0 0; }
 </style>
 </head>
 <body>
@@ -272,6 +296,24 @@
       <span>Allegati: <%= card.files.size %></span>
       <% @report.facebook_links(post).each do |url| %><span>Su Facebook: <a href="<%= url %>"><%= url.delete_prefix("https://www.") %></a></span><% end %>
     </div>
+    <% points = @report.stats_points(post) %>
+    <% if (totals = PostStats.totals_of(points.last)) %>
+      <div class="statistiche">
+        <% { views: "VISUALIZZAZIONI", reach: "PERSONE RAGGIUNTE" }.each do |kind, label| %>
+          <div class="statistica">
+            <span class="statistica-icona"><%= stats_icon(kind) %></span>
+            <div>
+              <div class="etichetta"><%= label %></div>
+              <strong><%= stats_number(totals.public_send(kind)) %></strong>
+              <% if (change = PostStats.change(points, kind)) %>
+                <span class="variazione"><b>+<%= stats_number(change.first) %></b> dal <%= l(change.last, format: "%-d %b") %></span>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+        <div class="nota">Totali dalla pubblicazione<br>lettura del <%= l(totals.measured_at, format: :short) %></div>
+      </div>
+    <% end %>
 
     <% if missing.any? %>
       <div class="mancanze <%= 'poche' if missing.size <= 3 %>">
@@ -321,6 +363,26 @@
         <% end %>
       </div>
     </div>
+    <% if points.any? %>
+      <div class="grafici">
+        <div class="grafici-testa">
+          <div class="etichetta">ANDAMENTO NEL TEMPO</div>
+          <span class="periodo">
+            <%= points.size == 1 ? "una lettura, il #{l(points.first.day, format: '%-d %B %Y')}" :
+                  "#{points.size} giorni di lettura, dal #{l(points.first.day, format: '%-d %b')} al #{l(points.last.day, format: '%-d %b %Y')}" %>
+          </span>
+        </div>
+        <div class="grafici-coppia">
+          <% %i[views reach].each do |kind| %>
+            <figure class="grafico">
+              <figcaption><span class="grafico-icona"><%= stats_icon(kind) %></span><%= PostStatsHelper::STATS_LABELS.fetch(kind) %></figcaption>
+              <%= stats_chart(points, kind, width: 310, height: 130) %>
+            </figure>
+          <% end %>
+        </div>
+        <p class="nota">Ogni punto è il totale dalla pubblicazione all'ultima lettura di quel giorno<%= "; la linea comparirà con le prossime letture" if points.size == 1 %>.</p>
+      </div>
+    <% end %>
   </section>
 <% end %>
 

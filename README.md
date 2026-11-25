@@ -95,23 +95,24 @@ Ogni azione sul post vale anche sulle sue pagine social (oggi solo Facebook, con
 
 ### Collegare la pagina Facebook (una volta sola)
 
-Serve un'app Meta tua, in **modalità sviluppo**: basta perché sei tu a gestire la pagina, senza revisione di Meta.
+Serve un'app Meta tua, **in modalità Live**: in modalità sviluppo i post pubblicati dall'app li vede solo chi ha
+un ruolo sull'app. Basta l'accesso standard, senza revisione di Meta, perché sei tu a gestire la pagina.
 
 1. Su [developers.facebook.com](https://developers.facebook.com/), con l'account Facebook che gestisce la pagina:
    **Le mie app → Crea app**. Caso d'uso: gestione di una Pagina (*Manage everything on your Page*).
-   Nome, per esempio, «Post social Creola». Lasciala in modalità sviluppo.
+   Per passare in Live servono l'URL dell'informativa sulla privacy, una categoria e un'icona.
 2. In **Impostazioni app → Di base** copia l'**ID app** e la **chiave segreta**.
 3. Apri il [Graph API Explorer](https://developers.facebook.com/tools/explorer/), scegli l'app, poi
-   **Ottieni token → Token d'accesso utente** con i permessi `pages_show_list`, `pages_read_engagement`,
-   `pages_manage_posts`, `pages_manage_engagement` (nel caso d'uso «Gestisci tutto sulla tua Pagina»
-   vanno aggiunti a mano `pages_manage_posts` e `pages_read_engagement`; `publish_video` lì non è disponibile,
-   quindi per ora i post con video non si possono pubblicare dall'app). Nella finestra di Facebook
-   seleziona la pagina della scuola. Copia il token generato.
+   **Token d'accesso utente** con i permessi `pages_show_list`, `business_management`, `pages_read_engagement`,
+   `pages_manage_posts` e `read_insights` (quest'ultimo serve per le statistiche dei post).
+   `public_profile` Facebook lo aggiunge da sé. Servono **tutti**: un token senza uno di questi lo perde.
+   `publish_video` non è disponibile, ma non serve: i video si pubblicano lo stesso.
+   Nella finestra di Facebook seleziona la pagina della scuola. Copia il token generato.
 4. Nel terminale:
    ```bash
    cd ~/Progetti/tinytales
-   bin/rails social:facebook:connect   # chiede ID app, chiave segreta e token (questi due non compaiono a schermo)
-   bin/rails social:facebook:check     # verifica: deve stampare il nome della pagina
+   env -u DATABASE bin/rails social:facebook:connect   # chiede ID app, chiave segreta e token (questi due non compaiono a schermo)
+   env -u DATABASE bin/rails social:facebook:check     # verifica: deve stampare il nome della pagina
    ```
 
 L'app salva solo il token della pagina, **cifrato** nel database (le chiavi sono nelle credenziali di Rails,
@@ -120,6 +121,49 @@ Il token della pagina non scade da solo, ma smette di funzionare se cambi la pas
 alla pagina o rimuovi l'app: in quel caso basta rifare `social:facebook:connect`.
 
 La versione delle Graph API è `v26.0`; si cambia con la variabile `FACEBOOK_GRAPH_VERSION`.
+
+### Statistiche dei post (visualizzazioni e persone raggiunte)
+
+Per ogni post pubblicato l'app salva le **visualizzazioni** (`post_media_view`) e le **persone raggiunte**
+(`post_total_media_view_unique`) nella tabella `publication_metrics`. C'è una riga per pubblicazione e per giorno
+(`measured_on`, in ora italiana), aggiornata a ogni lettura del giorno con l'ora esatta (`measured_at`). I numeri sono totali
+dalla pubblicazione, perché Facebook non dà il dettaglio giorno per giorno. Quelli di un giorno li calcolano
+`PublicationMetric#daily_views` e `#daily_reach` come differenza con il giorno letto prima, ma non se il post nel frattempo
+è stato ripubblicato (`remote_id` diverso). Le righe sono legate alla pubblicazione, quindi a una pagina social precisa:
+quando un post uscirà anche su altri social, ognuno avrà le sue.
+
+- **Dove si vedono** (solo per i post pubblicati):
+  - elenco a **lista**: colonna «Statistiche», con un'icona a occhio per le visualizzazioni e una a persone per quelle raggiunte;
+  - elenco a **griglia**: le stesse icone e gli stessi numeri in un'etichetta chiara e discreta sopra la copertina;
+  - **pagina del post** e **popup del calendario**: due riquadri «VISUALIZZAZIONI» e «PERSONE RAGGIUNTE» sotto lo stato,
+    con il totale e l'aumento dall'ultimo giorno letto prima («+69 dal 26 nov», `PostStats.change`); in fondo due grafici
+    dell'andamento nei giorni di lettura, ognuno nel suo riquadro (`TrendChart`, SVG disegnato sul server);
+  - **report PDF**: gli stessi riquadri e grafici nella pagina di ogni post pubblicato.
+- **Ordinamento:** nel filtro «Ordine» dell'elenco ci sono anche «Più/Meno visualizzazioni» e «Più/Meno persone raggiunte»
+  (`s=views desc`, `s=reach asc`…: scope `Post.sort_by_views_desc` e simili, che Ransack usa da solo). Conta il totale
+  salvato all'ultima lettura; i post senza numeri, come le bozze, vanno in fondo in entrambi i versi.
+- **Quando si leggono:** le pagine si aprono subito con i numeri salvati; poi il browser chiede quelli aggiornati
+  (controller Stimulus `stats-refresh` → `GET /posts/statistiche?ids=…&contesto=elenco|pagina|popup`, `PostsController#stats`).
+  L'app li legge dai social e risponde con un Turbo Stream che sostituisce sul posto numeri e grafici.
+  Il report PDF invece li aggiorna prima di generarsi, aspettando le risposte.
+- **Grafici:** l'asse del tempo è proporzionale (i giorni senza lettura restano spazi) e le date si diradano da sole
+  (ogni giorno, ogni 2/3/7/14 giorni, poi ogni 1/2/3/6/12 mesi) per non sovrapporsi. L'asse dei valori parte da zero
+  con tacche tonde. I pallini su ogni lettura compaiono solo se sono pochi e ben distanziati; il valore finale è scritto
+  in fondo alla linea. Al passaggio del mouse compaiono una linea guida e un suggerimento con data e valore.
+- **Come:** tutte le letture partono in una sola richiesta (batch di Facebook, fino a 50 post; oltre, più richieste in parallelo).
+  Per un video (reel) le statistiche stanno sul post che lo contiene: l'app chiede una volta il suo id e lo salva in
+  `publications.remote_post_id`.
+- **Limiti di Meta** (con il token della pagina: 4.800 chiamate ogni 24 ore × le persone che hanno interagito con la pagina;
+  ogni post letto conta come una chiamata, anche dentro la batch):
+  - un post letto da meno di un minuto non si rilegge (`PostMetrics::FRESH_FOR`);
+  - se Facebook dice che l'uso ha raggiunto il 75% del limite, la pagina non viene interrogata per 15 minuti; se risponde
+    «troppe chiamate» (errore 80001 o simili), per almeno 30, o di più se Meta stima un'attesa maggiore
+    (`social_pages.metrics_paused_until`);
+  - gli errori non bloccano mai le pagine né il report: restano i numeri salvati, e il problema finisce nel log
+    (righe `[statistiche Facebook]`).
+- **Codice:** `PostMetrics` (cosa leggere e quando frenare), `SocialMetrics::Facebook` (la lettura vera), `PostStats`
+  (totali e andamento sommati sui social), `TrendChart` e `PostStatsHelper` (grafici, icone e numeri),
+  `FacebookGraph::Client#batch` e `FacebookGraph::Usage` (l'uso dei limiti dalle intestazioni delle risposte).
 
 ## Assistente (Claude Code) nelle pagine di creazione e modifica
 

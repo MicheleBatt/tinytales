@@ -1,0 +1,37 @@
+<%# L'andamento di visualizzazioni e persone raggiunte di un post pubblicato, un grafico ciascuna, ognuno nel suo riquadro.
+    Locals: post, points ([PostStats::Point]), contesto ("pagina": affiancati; "popup": uno sotto l'altro). %>
+<% if PostStats.shown?(post) %>
+  <% popup = contesto == "popup" %>
+  <section class="grafici <%= 'grafici-popup' if popup %>" id="grafici-<%= post.id %>">
+    <div class="grafici-testa">
+      <h2>Andamento nel tempo</h2>
+      <% if points.any? %>
+        <span class="grafici-periodo">
+          <% if points.size == 1 %>
+            una lettura, il <%= l(points.first.day, format: "%-d %B %Y") %>
+          <% else %>
+            <%= points.size %> giorni di lettura, dal <%= l(points.first.day, format: "%-d %b") %> al <%= l(points.last.day, format: "%-d %b %Y") %>
+          <% end %>
+        </span>
+      <% end %>
+    </div>
+    <% if points.any? %>
+      <div class="grafici-coppia">
+        <% %i[views reach].each do |kind| %>
+          <figure class="grafico">
+            <figcaption>
+              <span class="grafico-icona"><%= stats_icon(kind) %></span><%= PostStatsHelper::STATS_LABELS.fetch(kind) %>
+            </figcaption>
+            <%= stats_chart(points, kind, width: popup ? 640 : 560, height: popup ? 160 : 190) %>
+          </figure>
+        <% end %>
+      </div>
+      <p class="grafici-nota">
+        Ogni punto è il totale dalla pubblicazione all'ultima lettura di quel giorno.
+        <% if points.size == 1 %>La linea comparirà con le prossime letture.<% end %>
+      </p>
+    <% else %>
+      <p class="vuoto">Nessuna lettura ancora: i numeri arrivano dai social all'apertura della pagina.</p>
+    <% end %>
+  </section>
+<% end %>

@@ -57,7 +57,7 @@
 
 <%= search_form_for @q, url: posts_path, html: { id: "filtri-post", class: "filtri", data: { turbo_action: "advance" } } do |f| %>
   <% if @view == "calendario" %><%= hidden_field_tag :mese, @month.strftime("%Y-%m"), id: nil %><% end %>
-  <div class="filtro filtro-largo">
+  <div class="filtro filtro-largo filtro-cerca">
     <%= f.label :title_or_body_or_notes_cont, "Cerca" %>
     <%= f.search_field :title_or_body_or_notes_cont, placeholder: "Titolo, testo o note…" %>
   </div>
@@ -77,9 +77,11 @@
     <%= f.label :publish_at_lteq, "Al" %>
     <%= f.date_field :publish_at_lteq %>
   </div>
-  <div class="filtro">
+  <div class="filtro filtro-ordine">
     <%= f.label :s, "Ordine" %>
-    <%= f.select :s, [ [ "Più recenti prima", "publish_at desc" ], [ "Meno recenti prima", "publish_at asc" ] ],
+    <%= f.select :s, [ [ "Più recenti prima", "publish_at desc" ], [ "Meno recenti prima", "publish_at asc" ],
+                       [ "Più visualizzazioni", "views desc" ], [ "Meno visualizzazioni", "views asc" ],
+                       [ "Più persone raggiunte", "reach desc" ], [ "Meno persone raggiunte", "reach asc" ] ],
                  selected: params.dig(:q, :s) || "publish_at desc" %>
   </div>
   <label class="filtro-spunta">
@@ -107,15 +109,18 @@
   <% if @view == "calendario" %>
     <%= render "calendario" %>
   <% elsif @posts.any? %>
-    <div class="elenco-post <%= 'vista-griglia' if @view == 'griglia' %>" role="table" aria-label="Post" data-view-switch-target="list">
+    <%# Dopo il caricamento il browser chiede i numeri aggiornati dei post pubblicati (stats-refresh). %>
+    <div class="elenco-post <%= 'vista-griglia' if @view == 'griglia' %>" role="table" aria-label="Post" data-view-switch-target="list"
+         <%= tag.attributes(data: { controller: "stats-refresh", stats_refresh_url_value: stats_refresh_url(@stats_ids, "elenco") }) if @stats_ids.any? %>>
       <div class="elenco-testa" role="row">
         <span role="columnheader"></span>
         <span role="columnheader">Post</span>
         <span role="columnheader">Pubblicazione</span>
         <span role="columnheader">Stato</span>
         <span role="columnheader">Pagine</span>
+        <span role="columnheader">Statistiche</span>
       </div>
-      <%= render partial: "post", collection: @posts %>
+      <%= render partial: "post", collection: @posts, locals: { stats: @stats } %>
     </div>
   <% else %>
     <p class="vuoto">Nessun post corrisponde ai filtri. <%= link_to "Mostra tutti i post", posts_path %></p>

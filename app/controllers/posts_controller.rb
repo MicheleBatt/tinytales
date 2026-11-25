@@ -2,7 +2,7 @@ class PostsController < ApplicationController
   SEARCH_FIELDS = %i[title_or_body_or_notes_cont status_eq social_pages_id_eq
                      publish_at_gteq publish_at_lteq notes_present s].freeze
 
-  before_action :promote_due_scheduled, only: %i[index show preview report]
+  before_action :promote_due_scheduled, only: %i[index show preview report stats]
   before_action :set_post, only: %i[show preview edit update destroy publish schedule unpublish resync]
   before_action :set_social_pages, only: %i[index new create edit update]
   before_action :set_assistant, only: %i[new create edit update]
@@ -12,16 +12,43 @@ class PostsController < ApplicationController
 
     @view = chosen_view
     prepare_calendar if @view == "calendario"
+    prepare_stats unless @view == "calendario"
     @counts = Post.group(:status).count
     @next_post = Post.scheduled.where(publish_at: Time.current..).order(:publish_at).first
   end
 
   def show
+    @stats_points = PostStats.series([ @post.id ])[@post.id] || []
+  end
+
+  # Visualizzazioni e persone raggiunte aggiornate dai social, chieste dal browser appena la pagina è sullo schermo
+  # (controller stats-refresh): la pagina si apre subito con i numeri salvati, poi questi li sostituiscono.
+  # ids: i post; contesto: «elenco» (i numeri delle righe), «pagina» o «popup» (numeri e grafici di un post).
+  def stats
+    ids = params[:ids].to_s.split(",").map(&:to_i).uniq.first(500)
+    posts = Post.where(id: ids).includes(publications: :social_page).to_a
+    PostMetrics.refresh(posts.flat_map(&:publications))
+
+    if %w[pagina popup].include?(params[:contesto])
+      post = posts.first or return head(:no_content)
+      points = PostStats.series([ post.id ])[post.id] || []
+      render turbo_stream: [
+        turbo_stream.replace("statistiche-#{post.id}", partial: "posts/statistiche", locals: { post:, points: }),
+        turbo_stream.replace("grafici-#{post.id}", partial: "posts/grafici", locals: { post:, points:, contesto: params[:contesto] })
+      ]
+    else
+      totals = PostStats.latest(posts.map(&:id))
+      render turbo_stream: posts.map { |post|
+        turbo_stream.replace("metriche-#{post.id}", partial: "posts/metriche_elenco", locals: { post:, totals: totals[post.id] })
+      }
+    end
   end
 
   # Il report in PDF dei post, con gli stessi filtri dell'elenco. Lo prepara Chrome: qualche secondo.
+  # Prima aggiorna le statistiche dei post, aspettando le risposte dei social.
   def report
     posts = filtered_posts.includes(publications: :social_page)
+    PostMetrics.refresh(posts.flat_map(&:publications))
     pdf = PostsReport.new(posts, filters: filters_summary).to_pdf
     send_data pdf, type: "application/pdf", disposition: "attachment",
                    filename: "report-post-scuola-creola-#{Date.current.iso8601}.pdf"
@@ -31,7 +58,8 @@ class PostsController < ApplicationController
 
   # L'anteprima del post nel popup della vista a calendario (solo il contenuto, senza layout).
   def preview
-    render partial: "anteprima", locals: { post: @post, return_to: back_path }
+    points = PostStats.series([ @post.id ])[@post.id] || []
+    render partial: "anteprima", locals: { post: @post, return_to: back_path, stats_points: points }
   end
 
   def new
@@ -158,6 +186,13 @@ class PostsController < ApplicationController
                             .group_by { |post| post.publish_at.to_date }
     @undated_posts = @posts.reorder(:id).where(publish_at: nil)
     @month_count = @calendar_posts.select { |day, _| day.month == @month.month }.values.sum(&:size)
+  end
+
+  # Lista e griglia: i numeri salvati di ogni post, e quali post vanno aggiornati dai social dopo il caricamento.
+  def prepare_stats
+    ids = @posts.map(&:id)
+    @stats = PostStats.latest(ids)
+    @stats_ids = PostMetrics.readable.where(post_id: ids).distinct.pluck(:post_id)
   end
 
   def sync(notice:, failure: "L'azione non è riuscita")

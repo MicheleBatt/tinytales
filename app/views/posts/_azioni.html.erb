@@ -1,7 +1,11 @@
 <%# I bottoni di un post (pubblica, programma, spubblica, modifica, elimina): pagina del post e popup del calendario.
-    return_to: dove tornare dopo l'azione (per esempio il calendario); senza, si torna alla pagina del post. %>
+    return_to: dove tornare dopo l'azione (per esempio il calendario); senza, si torna alla pagina del post.
+    inline_confirm: true nel popup, dove le conferme si aprono a fisarmonica sotto i bottoni invece che in un'altra
+    finestra sopra il popup (confirm_dialog.js); nella pagina del post restano le finestre. %>
 <% return_to = local_assigns[:return_to].presence %>
 <% back = return_to ? { return_to: } : {} %>
+<% inline = local_assigns[:inline_confirm] %>
+<% if inline %><div class="azioni-con-conferma" data-conferma-in-linea><% end %>
 <div class="azioni-post">
   <% on_pages = social_pages_phrase(post) %>
   <% from_pages = social_pages_phrase(post, from: true) %>
@@ -54,3 +58,4 @@
                 form: { data: { turbo_confirm: confirm, confirm_title: "Eliminare il post?", confirm_button: "Elimina", confirm_tone: "pericolo",
                                 busy_message: (post.draft? ? nil : "Eliminazione del post e rimozione #{from_pages} in corso…") } } %>
 </div>
+<% if inline %></div><% end %>

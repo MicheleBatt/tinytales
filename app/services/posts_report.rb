@@ -52,6 +52,13 @@ class PostsReport
     end
   end
 
+  # Visualizzazioni e persone raggiunte di un post pubblicato, giorno per giorno ([PostStats::Point]; vuoto per gli altri).
+  # PostsController#report le aggiorna dai social prima di preparare il report.
+  def stats_points(post)
+    @stats_series ||= PostStats.series(@posts.select { |p| PostStats.shown?(p) }.map(&:id))
+    PostStats.shown?(post) ? (@stats_series[post.id] || []) : []
+  end
+
   def total = cards.size
   def count(status) = @posts.count { |post| post.status == status }
   def provisional_count = cards.count(&:provisional?)

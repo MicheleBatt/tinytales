@@ -9,6 +9,10 @@ import { Turbo } from "@hotwired/turbo-rails"
 //   data-confirm-datetime-value  già compilato con questo valore (AAAA-MM-GGTHH:MM),
 //   data-confirm-datetime-label / -help   etichetta e aiuto del campo; si accettano date da 10 minuti a 30 giorni da adesso.
 // Annulla, ×, Esc o un clic fuori dalla finestra: non succede niente.
+//
+// Dentro un elemento con data-conferma-in-linea (i bottoni nel popup del calendario, che è già una finestra) la conferma
+// non apre un'altra finestra sopra: si apre a fisarmonica una regione sotto i bottoni, con gli stessi testi e campi.
+// Un secondo clic sullo stesso bottone la richiude; il clic su un altro bottone la sostituisce.
 let dialog
 
 function build() {
@@ -76,6 +80,104 @@ function confirmWithDialog(message, element) {
   })
 }
 
+// ---------- conferma a fisarmonica, sotto i bottoni (popup del calendario) ----------
+
+let pending = null // la conferma in linea aperta: { form, region, finish }
+
+function confirmInline(message, element, container) {
+  const form = element?.closest?.("form") || element
+  const source = element?.closest?.("[data-confirm-title], [data-confirm-button], [data-confirm-tone]") || element
+
+  // Secondo clic sullo stesso bottone: la regione si richiude.
+  if (pending && pending.form === form) {
+    pending.finish(false)
+    return Promise.resolve(false)
+  }
+  pending?.finish(false, { keepOpen: true })
+
+  const region = inlineRegion(container)
+  const danger = source?.dataset?.confirmTone === "pericolo"
+  region.querySelector(".conferma-in-linea-titolo").textContent = source?.dataset?.confirmTitle || "Confermi?"
+  region.querySelector(".conferma-messaggio").textContent = message
+  const proceed = region.querySelector(".conferma-procedi")
+  proceed.textContent = source?.dataset?.confirmButton || "Procedi"
+  proceed.classList.toggle("bottone-pericolo-pieno", danger)
+  proceed.classList.toggle("bottone-principale", !danger)
+  region.classList.toggle("conferma-pericolo", danger)
+  const field = setUpDateField(region, source)
+
+  const toggle = form.querySelector("button[type=submit], input[type=submit]")
+  container.querySelectorAll("[aria-expanded]").forEach((button) => button.setAttribute("aria-expanded", "false"))
+  toggle?.setAttribute("aria-expanded", "true")
+  toggle?.setAttribute("aria-controls", region.id)
+  region.hidden = false
+  region.scrollIntoView({ block: "nearest" })
+
+  return new Promise((resolve) => {
+    const finish = (answer, { keepOpen = false } = {}) => {
+      region.removeEventListener("click", onClick)
+      region.removeEventListener("keydown", onKey)
+      toggle?.setAttribute("aria-expanded", "false")
+      if (!keepOpen) region.hidden = true
+      if (pending?.form === form) pending = null
+      resolve(answer)
+    }
+    const onClick = (event) => {
+      const choice = event.target.closest("[data-esito]")?.dataset.esito
+      if (choice === "si" && field) {
+        const error = field.error()
+        if (error) return field.show(error)
+        finish(false) // Turbo ha già preparato i dati del form: si rinvia con la data scelta
+        resubmitWithDate(form, field.name, field.input.value)
+      } else if (choice) {
+        finish(choice === "si")
+        if (choice === "no") toggle?.focus()
+      }
+    }
+    // Esc nella regione la richiude, senza chiudere il popup.
+    const onKey = (event) => {
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      event.stopPropagation()
+      finish(false)
+      toggle?.focus()
+    }
+    region.addEventListener("click", onClick)
+    region.addEventListener("keydown", onKey)
+    pending = { form, region, finish }
+    ;(danger ? region.querySelector(".conferma-piede [data-esito=no]") : field ? field.input : proceed).focus()
+  })
+}
+
+// La regione sotto i bottoni, creata la prima volta (una per contenitore).
+function inlineRegion(container) {
+  let region = container.querySelector(".conferma-in-linea")
+  if (region) return region
+
+  const id = `conferma-in-linea-${Math.random().toString(36).slice(2, 8)}`
+  region = document.createElement("section")
+  region.className = "conferma-in-linea"
+  region.id = id
+  region.hidden = true
+  region.setAttribute("role", "region")
+  region.setAttribute("aria-labelledby", `${id}-titolo`)
+  region.innerHTML = `
+    <h3 class="conferma-in-linea-titolo" id="${id}-titolo"></h3>
+    <p class="conferma-messaggio"></p>
+    <div class="conferma-campo" hidden>
+      <label for="${id}-data"></label>
+      <input type="datetime-local" id="${id}-data" step="60" required>
+      <span class="aiuto conferma-aiuto"></span>
+      <span class="errore-campo conferma-errore" hidden></span>
+    </div>
+    <footer class="conferma-piede">
+      <button type="button" class="bottone" data-esito="no">Annulla</button>
+      <button type="button" class="bottone conferma-procedi" data-esito="si"></button>
+    </footer>`
+  container.append(region)
+  return region
+}
+
 // Il campo data e ora, se il form lo chiede. Restituisce null se non serve.
 function setUpDateField(box, source) {
   const wrapper = box.querySelector(".conferma-campo")
@@ -139,5 +241,11 @@ function resubmitWithDate(form, name, value) {
   }
 }
 
-if (Turbo.config?.forms) Turbo.config.forms.confirm = confirmWithDialog
-else Turbo.setConfirmMethod(confirmWithDialog)
+// Nel popup del calendario la conferma a fisarmonica, altrove la finestra.
+function confirmMethod(message, element) {
+  const container = element?.closest?.("[data-conferma-in-linea]")
+  return container ? confirmInline(message, element, container) : confirmWithDialog(message, element)
+}
+
+if (Turbo.config?.forms) Turbo.config.forms.confirm = confirmMethod
+else Turbo.setConfirmMethod(confirmMethod)

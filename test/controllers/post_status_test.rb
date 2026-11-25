@@ -219,6 +219,19 @@ class PostStatusTest < ActionDispatch::IntegrationTest
     assert_select "a.anteprima-link[href='#{post_path(posts(:promemoria))}']"
   end
 
+  test "nel popup le conferme si aprono sotto i bottoni (stessi testi), nella pagina del post restano le finestre" do
+    get preview_post_path(posts(:festa_di_natale)), params: { return_to: "/posts?vista=calendario" }
+    assert_select ".anteprima-post .azioni-con-conferma[data-conferma-in-linea] > .azioni-post" do
+      assert_select "form[data-turbo-confirm][data-confirm-title='Pubblicare adesso?']"
+      assert_select "form[data-turbo-confirm][data-confirm-title='Programmare il post?'][data-confirm-datetime-name=publish_at]"
+      assert_select "form[data-turbo-confirm][data-confirm-tone=pericolo][data-confirm-button=Elimina]"
+    end
+
+    get post_path(posts(:festa_di_natale))
+    assert_select "[data-conferma-in-linea]", count: 0
+    assert_select ".azioni-post form[data-turbo-confirm]", minimum: 3
+  end
+
   test "un'azione lanciata dal popup torna al calendario; un indirizzo esterno viene ignorato" do
     back = "/posts?vista=calendario&mese=2026-11"
     patch schedule_post_path(posts(:mensa)), params: { return_to: back }
