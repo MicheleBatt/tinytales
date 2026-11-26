@@ -18,11 +18,17 @@ class FakeFacebookClient
 
   # Le statistiche che Facebook darà per un id: insights("1234_999", views: 10, reach: 4, reactions: { "like" => 3 }),
   # oppure un errore: insights("1234_999", error: FacebookGraph::Error.new(...)).
-  # reactions sono le reazioni sul post (lettura del campo reactions): senza, quella lettura dà un corpo vuoto;
-  # reactions_error la fa fallire.
-  def insights(id, views: nil, reach: nil, reactions: nil, error: nil, reactions_error: nil)
-    @insights[id] = error || { "data" => [ { "name" => "post_media_view", "values" => [ { "value" => views } ] },
-                                         { "name" => "post_total_media_view_unique", "values" => [ { "value" => reach } ] } ] }
+  # shares sono le condivisioni delle statistiche (voce share di post_activity_by_action_type): con 0 la voce manca,
+  # come fa Facebook; con nil manca tutta la metrica. reactions vengono dalla lettura del campo del post: senza, quella
+  # lettura dà un corpo vuoto; reactions_error la fa fallire.
+  def insights(id, views: nil, reach: nil, reactions: nil, shares: nil, error: nil, reactions_error: nil)
+    data = [ { "name" => "post_media_view", "values" => [ { "value" => views } ] },
+             { "name" => "post_total_media_view_unique", "values" => [ { "value" => reach } ] } ]
+    unless shares.nil?
+      activity = { "like" => 3 }.merge(shares.positive? ? { "share" => shares } : {})
+      data << { "name" => "post_activity_by_action_type", "values" => [ { "value" => activity } ] }
+    end
+    @insights[id] = error || { "data" => data }
     @reactions[id] = reactions_error || (reactions && reactions_field(reactions))
   end
 

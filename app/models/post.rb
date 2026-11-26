@@ -33,15 +33,15 @@ class Post < ApplicationRecord
   STATS_TOTALS_JOIN = <<~SQL.squish
     LEFT JOIN (
       SELECT publications.post_id, SUM(latest.total_views) AS views, SUM(latest.total_reach) AS reach,
-             SUM(latest.total_reactions) AS reactions
-      FROM (SELECT DISTINCT ON (publication_id) publication_id, total_views, total_reach, total_reactions
+             SUM(latest.total_reactions) AS reactions, SUM(latest.total_shares) AS shares
+      FROM (SELECT DISTINCT ON (publication_id) publication_id, total_views, total_reach, total_reactions, total_shares
             FROM publication_metrics ORDER BY publication_id, measured_on DESC) latest
       JOIN publications ON publications.id = latest.publication_id
       GROUP BY publications.post_id
     ) post_totals ON post_totals.post_id = posts.id AND posts.status = 'published'
   SQL
 
-  %w[views reach reactions].each do |field|
+  %w[views reach reactions shares].each do |field|
     %w[asc desc].each do |dir|
       scope :"sort_by_#{field}_#{dir}", lambda {
         joins(STATS_TOTALS_JOIN).select("posts.*", "post_totals.#{field} AS stats_#{field}")

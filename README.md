@@ -124,7 +124,7 @@ alla pagina o rimuovi l'app: in quel caso basta rifare `social:facebook:connect`
 
 La versione delle Graph API è `v26.0`; si cambia con la variabile `FACEBOOK_GRAPH_VERSION`.
 
-### Statistiche dei post (visualizzazioni, persone raggiunte e reazioni)
+### Statistiche dei post (visualizzazioni, persone raggiunte, reazioni e condivisioni)
 
 **Reazioni** (dal 26/11/2026): nella stessa richiesta, per ogni post, l'app legge anche il campo `reactions` del post,
 con il totale e un conteggio per tipo (LIKE, LOVE, CARE, HAHA, WOW, SAD, ANGRY). Sono gli stessi numeri che si vedono
@@ -135,6 +135,18 @@ dava 21 contro i 14 visibili. Si salvano il totale in `total_reactions` e il det
 nella pagina del post, nel popup e nel PDF anche con il dettaglio per tipo (👍 12 · ❤️ 2), con un terzo grafico
 dell'andamento e con l'ordinamento «Più/Meno reazioni». Le letture salvate prima non hanno reazioni (nil): quei giorni
 restano fuori dal grafico e dall'aumento giornaliero. Con due letture per post, una batch contiene 25 post.
+
+**Condivisioni** (dal 26/11/2026): vengono dalle statistiche, cioè dalla voce `share` della metrica
+`post_activity_by_action_type`, letta insieme a visualizzazioni e persone. Contano **tutte** le condivisioni fatte, anche
+quelle private (profili con visibilità «Amici», gruppi chiusi) o poi cancellate. Per questo possono essere più di quelle
+che si vedono sotto il post, ma sono stabili e non dipendono da chi guarda. Il campo `shares` del post **non va usato**:
+conta solo le condivisioni che il token può vedere (le pubbliche), cambia da un'ora all'altra e non coincide con quello che
+vede ciascuno (Open Day il 26/11: campo 6, Michele 7, statistiche 8). Si salvano in `total_shares` e compaiono come quarta
+misura «Condivisioni» (icona a freccia) ovunque. Sotto il numero, nella pagina del post, nel popup e nel PDF, c'è la
+didascalia sempre visibile «anche private o poi cancellate» (`STATS_CAPTIONS`); la spiegazione completa sta nel suggerimento
+al passaggio del mouse e nella nota dei grafici. Ci sono anche il quarto grafico e l'ordinamento
+«Più/Meno condivisioni». Con quattro misure i grafici sono disposti 2 × 2 nella pagina del post e nel PDF, uno sotto
+l'altro nel popup.
 
 
 Per ogni post pubblicato l'app salva le **visualizzazioni** (`post_media_view`) e le **persone raggiunte**

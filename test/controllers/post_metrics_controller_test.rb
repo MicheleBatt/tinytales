@@ -35,7 +35,7 @@ class PostMetricsControllerTest < ActionDispatch::IntegrationTest
   def save_readings_with_reactions
     save_readings
     PublicationMetric.record!(@open_day, views: 1000, reach: 350, reactions: 21, reactions_by_type: { "love" => 2, "like" => 19 },
-                                         at: Time.zone.local(2026, 11, 16, 9))
+                                         shares: 7, at: Time.zone.local(2026, 11, 16, 9))
   end
 
   test "con le reazioni: terza misura in elenco, riquadro con il dettaglio per tipo e terzo grafico nella pagina" do
@@ -51,8 +51,18 @@ class PostMetricsControllerTest < ActionDispatch::IntegrationTest
       assert_select ".statistica-tipi span[title=Love]", text: "❤️ 2"
     end
     assert_select "#statistiche-#{@post.id} .statistica-reactions .statistica-variazione", count: 0, message: "il giorno prima non c'erano"
-    assert_select "#grafici-#{@post.id} figure.grafico", count: 3
+    assert_select "#grafici-#{@post.id} figure.grafico", count: 4
     assert_select "#grafici-#{@post.id} figcaption", text: "Reazioni"
+    assert_select "#grafici-#{@post.id} figcaption", text: "Condivisioni"
+    assert_select "#statistiche-#{@post.id} .statistica-shares .statistica-etichetta", text: "CONDIVISIONI"
+    assert_select "#statistiche-#{@post.id} .statistica-shares .statistica-numero", text: "7"
+    assert_select "#statistiche-#{@post.id} .statistica-shares[title*='anche quelle private']"
+    assert_select "#statistiche-#{@post.id} .statistica-shares .statistica-didascalia", text: "anche private o poi cancellate"
+    assert_select "#statistiche-#{@post.id} .statistica-didascalia", count: 1
+    assert_select "#grafici-#{@post.id} .grafici-nota", text: /condivisioni contano anche quelle private/
+
+    get posts_path(vista: "griglia")
+    assert_select "#metriche-#{@post.id} .metrica[title^='Condivisioni: Tutte le condivisioni'] .metrica-numero", text: "7"
   end
 
   test "senza reazioni lette, la terza misura e il terzo grafico non compaiono" do
@@ -74,15 +84,20 @@ class PostMetricsControllerTest < ActionDispatch::IntegrationTest
     assert_equal [ other.title, @post.title ], titles.("reactions desc").first(2)
     assert_equal [ @post.title, other.title ], titles.("reactions asc").first(2)
     assert_select "#q_s option", text: "Più reazioni"
+    shares_order = titles.("shares desc")
+    assert_equal @post.title, shares_order.first
+    assert_operator shares_order.index(other.title), :>, 0, "l'altro post non ha condivisioni lette: dopo, fra quelli senza numeri"
+    assert_select "#q_s option", text: "Meno condivisioni"
 
     printed = []
     PostsReport.printer = ->(html, pdf_path) { printed << File.read(html); File.write(pdf_path, "%PDF-1.4 finto") }
     PostsReport.text_of = ->(_pdf) { [] }
     get report_posts_path
     card = Nokogiri::HTML(printed.last).css(".scheda").find { |section| section.at_css("h2").text == @post.title }
-    assert_equal [ "VISUALIZZAZIONI", "PERSONE RAGGIUNTE", "REAZIONI" ], card.css(".statistica .etichetta").map { |e| e.text.strip }
+    assert_equal [ "VISUALIZZAZIONI", "PERSONE RAGGIUNTE", "REAZIONI", "CONDIVISIONI" ], card.css(".statistica .etichetta").map { |e| e.text.strip }
     assert_equal [ "👍 19", "❤️ 2" ], card.css(".statistica .tipi span").map(&:text)
-    assert_equal 3, card.css(".grafici svg.trend-chart").size
+    assert_equal 4, card.css(".grafici svg.trend-chart").size
+    assert_equal [ "anche private o poi cancellate" ], card.css(".statistica .didascalia").map { |e| e.text.strip }
   ensure
     PostsReport.printer = nil
     PostsReport.text_of = nil

@@ -82,7 +82,8 @@
     <%= f.select :s, [ [ "Più recenti prima", "publish_at desc" ], [ "Meno recenti prima", "publish_at asc" ],
                        [ "Più visualizzazioni", "views desc" ], [ "Meno visualizzazioni", "views asc" ],
                        [ "Più persone raggiunte", "reach desc" ], [ "Meno persone raggiunte", "reach asc" ],
-                       [ "Più reazioni", "reactions desc" ], [ "Meno reazioni", "reactions asc" ] ],
+                       [ "Più reazioni", "reactions desc" ], [ "Meno reazioni", "reactions asc" ],
+                       [ "Più condivisioni", "shares desc" ], [ "Meno condivisioni", "shares asc" ] ],
                  selected: params.dig(:q, :s) || "publish_at desc" %>
   </div>
   <label class="filtro-spunta">

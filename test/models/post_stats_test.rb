@@ -64,6 +64,18 @@ class PostStatsTest < ActiveSupport::TestCase
     assert_equal [ 80, Date.new(2026, 11, 25) ], PostStats.change(points, :views)
   end
 
+  test "le condivisioni si sommano sui social; se il totale scende (post ripubblicato) niente aumento" do
+    PublicationMetric.record!(@facebook, views: 100, reach: 40, shares: 13, at: Time.zone.local(2026, 11, 25, 10))
+    PublicationMetric.record!(@instagram, views: 30, reach: 10, shares: 2, at: Time.zone.local(2026, 11, 25, 10))
+    PublicationMetric.record!(@facebook, views: 120, reach: 45, shares: 11, at: Time.zone.local(2026, 11, 26, 10))
+
+    points = PostStats.series([ @post.id ])[@post.id]
+    assert_equal [ 15, 13 ], points.map(&:shares)
+    assert_nil PostStats.change(points, :shares)
+    assert_equal 13, PostStats.latest([ @post.id ])[@post.id].shares
+    assert_equal 0, @facebook.metrics.find_by(measured_on: Date.new(2026, 11, 26)).daily_shares
+  end
+
   test "si mostrano solo per i post pubblicati" do
     assert PostStats.shown?(@post)
     assert_not PostStats.shown?(posts(:mensa))

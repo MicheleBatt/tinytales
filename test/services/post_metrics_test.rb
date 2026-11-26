@@ -18,8 +18,8 @@ class PostMetricsTest < ActiveSupport::TestCase
     assert_equal [ 916, 320, Date.new(2026, 11, 25), Time.current, "1234_999" ],
                  [ metric.total_views, metric.total_reach, metric.measured_on, metric.measured_at, metric.remote_id ]
     # promemoria è solo programmato, mensa e festa sono bozze: nessuna lettura per loro
-    assert_equal [ "1234_999/insights?metric=post_media_view,post_total_media_view_unique&period=lifetime",
-                   "1234_999?fields=#{SocialMetrics::Facebook::REACTIONS_FIELDS}" ], @facebook.batches.sole
+    assert_equal [ "1234_999/insights?metric=post_media_view,post_total_media_view_unique,post_activity_by_action_type&period=lifetime",
+                   "1234_999?fields=#{SocialMetrics::Facebook::POST_FIELDS}" ], @facebook.batches.sole
   end
 
   test "le reazioni si leggono dal post, nella stessa richiesta: il totale e il dettaglio per tipo; senza reazioni zero" do
@@ -29,13 +29,32 @@ class PostMetricsTest < ActiveSupport::TestCase
     metric = @open_day.metrics.sole
     assert_equal [ 14, { "like" => 12, "love" => 2 } ], [ metric.total_reactions, metric.reactions_by_type ]
     insights_path, reactions_path = @facebook.batches.sole
-    assert_equal "1234_999/insights?metric=post_media_view,post_total_media_view_unique&period=lifetime", insights_path
+    assert_equal "1234_999/insights?metric=post_media_view,post_total_media_view_unique,post_activity_by_action_type&period=lifetime", insights_path
     assert_match(/\A1234_999\?fields=reactions\.limit\(0\)\.summary\(total_count\)\.as\(totale\),reactions\.type\(LIKE\)/, reactions_path)
 
     travel 2.minutes
     @facebook.insights("1234_999", views: 460, reach: 219, reactions: {})
     PostMetrics.refresh(all_publications)
     assert_equal [ 0, {} ], [ @open_day.metrics.sole.total_reactions, @open_day.metrics.sole.reactions_by_type ]
+  end
+
+  test "le condivisioni vengono dalle statistiche (voce share), anche se le reazioni non si leggono; senza la voce sono zero" do
+    @facebook.insights("1234_999", views: 302, reach: 173, shares: 8,
+                                   reactions_error: FacebookGraph::Error.new("Facebook: (#10) permesso mancante", code: 10))
+    PostMetrics.refresh(all_publications)
+    assert_equal [ 8, nil ], @open_day.metrics.sole.attributes.values_at("total_shares", "total_reactions")
+    assert_includes @facebook.batches.last.first, "post_activity_by_action_type"
+    assert_not @facebook.batches.last.last.include?("shares"), "il campo shares del post non si legge più"
+
+    travel 2.minutes
+    @facebook.insights("1234_999", views: 303, reach: 173, shares: 0, reactions: { "like" => 8 })
+    PostMetrics.refresh(all_publications)
+    assert_equal 0, @open_day.metrics.sole.total_shares
+
+    travel 2.minutes
+    @facebook.insights("1234_999", views: 304, reach: 173)
+    PostMetrics.refresh(all_publications)
+    assert_nil @open_day.metrics.sole.total_shares, "senza la metrica non si sa"
   end
 
   test "se le reazioni non si possono leggere, visualizzazioni e persone si salvano lo stesso" do

@@ -1,4 +1,4 @@
-<%# Visualizzazioni, persone raggiunte e reazioni di un post pubblicato, scritte per esteso (pagina del post e popup del
+<%# Visualizzazioni, persone raggiunte, reazioni e condivisioni di un post pubblicato, scritte per esteso (pagina del post e popup del
     calendario): un riquadro ciascuna con icona, totale dalla pubblicazione e aumento dall'ultimo giorno letto prima;
     per le reazioni anche il dettaglio per tipo. Locals: post, points ([PostStats::Point], vuoto se non ci sono letture). %>
 <% if PostStats.shown?(post) %>
@@ -6,13 +6,16 @@
     <% if (totals = PostStats.totals_of(points.last)) %>
       <% PostStats::KINDS.each do |kind| %>
         <% next if (value = totals.public_send(kind)).nil? %>
-        <div class="statistica statistica-<%= kind %>">
+        <div class="statistica statistica-<%= kind %>" <%= tag.attributes(title: PostStatsHelper::STATS_NOTES[kind]) %>>
           <span class="statistica-icona"><%= stats_icon(kind) %></span>
           <span class="statistica-dati">
             <span class="statistica-etichetta"><%= PostStatsHelper::STATS_LABELS.fetch(kind).upcase %></span>
             <strong class="statistica-numero"><%= stats_number(value) %></strong>
             <% if (change = PostStats.change(points, kind)) %>
               <span class="statistica-variazione"><b>+<%= stats_number(change.first) %></b> dal <%= l(change.last, format: "%-d %b") %></span>
+            <% end %>
+            <% if (caption = PostStatsHelper::STATS_CAPTIONS[kind]) %>
+              <span class="statistica-didascalia"><%= caption %></span>
             <% end %>
             <% if kind == :reactions && (types = reactions_breakdown(totals.reactions_by_type)).any? %>
               <span class="statistica-tipi">
@@ -24,7 +27,7 @@
       <% end %>
       <span class="statistiche-nota">Totali dalla pubblicazione<br>lettura del <%= l(totals.measured_at, format: :short) %></span>
     <% else %>
-      <span class="statistiche-nota">Visualizzazioni, persone raggiunte e reazioni: in arrivo dai social…</span>
+      <span class="statistiche-nota">Visualizzazioni, persone raggiunte, reazioni e condivisioni: in arrivo dai social…</span>
     <% end %>
   </div>
 <% end %>

@@ -133,23 +133,24 @@
   .allegato.altri { color: var(--tenue); font-weight: 700; background: var(--fondo); padding: 2.5mm 3mm; }
 
   /* ---------- statistiche dei post pubblicati ---------- */
-  .statistiche { display: flex; align-items: stretch; gap: 3mm; margin-top: 3mm; }
-  .statistica { display: flex; align-items: center; gap: 2.5mm; flex: 1 1 0; min-width: 0; padding: 2mm 3mm 2mm 2.5mm; border: .25mm solid var(--linea); border-radius: 1.5mm; }
-  .statistica-icona { display: flex; align-items: center; justify-content: center; width: 8mm; height: 8mm; border-radius: 50%;
+  .statistiche { display: flex; flex-wrap: wrap; align-items: stretch; gap: 2.5mm; margin-top: 3mm; }
+  .statistica { display: flex; align-items: center; gap: 2mm; flex: 1 1 0; min-width: 0; padding: 1.8mm 2.5mm 1.8mm 2mm; border: .25mm solid var(--linea); border-radius: 1.5mm; }
+  .statistica-icona { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 6.5mm; height: 6.5mm; border-radius: 50%;
                       background: var(--programmato-fondo); color: #2456A6; }
-  .statistica-icona .icona-statistica { width: 4.2mm; height: 4.2mm; }
-  .statistica .etichetta { margin-bottom: .6mm; white-space: nowrap; letter-spacing: .08em; }
+  .statistica-icona .icona-statistica { width: 3.6mm; height: 3.6mm; }
+  .statistica .etichetta { margin-bottom: .6mm; white-space: nowrap; letter-spacing: .06em; font-size: 6.8pt; }
   .statistica strong { display: block; font: 700 15pt/1.05 var(--sans); }
   .statistica .variazione { font-size: 7.5pt; color: var(--tenue); }
   .statistica .variazione b { color: var(--pubblicato); }
   .statistica .tipi { display: flex; flex-wrap: wrap; gap: 0 2mm; font-size: 7.5pt; color: var(--tenue); }
-  .statistiche .nota { align-self: center; margin-left: auto; font-size: 7.6pt; line-height: 1.45; color: var(--tenue); text-align: right; }
+  .statistica .didascalia { display: block; font-size: 6.8pt; font-style: italic; color: var(--tenue); }
+  .statistiche .nota { flex: 0 0 100%; font-size: 7.4pt; color: var(--tenue); }
   .icona-statistica { width: 3.4mm; height: 3.4mm; }
   /* I grafici in fondo alla pagina, ognuno nel suo riquadro: il testo e gli allegati si adattano allo spazio che resta. */
   .grafici { flex: 0 0 auto; margin-top: 4mm; }
   .grafici-testa { display: flex; justify-content: space-between; align-items: baseline; }
   .grafici-testa .periodo { font-size: 7.5pt; color: var(--tenue); }
-  .grafici-coppia { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3mm; }
+  .grafici-coppia { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2.5mm 4mm; }
   .grafico { margin: 0; min-width: 0; padding: 2.5mm 3mm 1.5mm; border: .25mm solid var(--linea); border-radius: 1.5mm; }
   .grafico figcaption { display: flex; align-items: center; gap: 1.5mm; font-size: 8pt; font-weight: 700; margin-bottom: 1.5mm; }
   .grafico-icona { display: flex; align-items: center; justify-content: center; width: 5.5mm; height: 5.5mm; border-radius: 50%;
@@ -310,13 +311,16 @@
               <% if (change = PostStats.change(points, kind)) %>
                 <span class="variazione"><b>+<%= stats_number(change.first) %></b> dal <%= l(change.last, format: "%-d %b") %></span>
               <% end %>
+              <% if (caption = PostStatsHelper::STATS_CAPTIONS[kind]) %>
+                <span class="didascalia"><%= caption %></span>
+              <% end %>
               <% if kind == :reactions && (types = reactions_breakdown(totals.reactions_by_type)).any? %>
                 <span class="tipi"><% types.each do |emoji, _name, count| %><span><%= emoji %> <%= stats_number(count) %></span><% end %></span>
               <% end %>
             </div>
           </div>
         <% end %>
-        <div class="nota">Totali dalla pubblicazione<br>lettura del <%= l(totals.measured_at, format: :short) %></div>
+        <div class="nota">Totali dalla pubblicazione · lettura del <%= l(totals.measured_at, format: :short) %></div>
       </div>
     <% end %>
 
@@ -382,11 +386,11 @@
             <% next if points.none? { |point| point.public_send(kind) } %>
             <figure class="grafico">
               <figcaption><span class="grafico-icona"><%= stats_icon(kind) %></span><%= PostStatsHelper::STATS_LABELS.fetch(kind) %></figcaption>
-              <%= stats_chart(points, kind, width: 200, height: 120) %>
+              <%= stats_chart(points, kind, width: 330, height: 92) %>
             </figure>
           <% end %>
         </div>
-        <p class="nota">Ogni punto è il totale dalla pubblicazione all'ultima lettura di quel giorno<%= "; la linea comparirà con le prossime letture" if points.size == 1 %>.</p>
+        <p class="nota">Ogni punto è il totale dalla pubblicazione all'ultima lettura di quel giorno<%= "; la linea comparirà con le prossime letture" if points.size == 1 %>.<%= " Le condivisioni contano anche quelle private o poi cancellate: possono essere più di quelle visibili sotto il post." if points.any?(&:shares) %></p>
       </div>
     <% end %>
   </section>
