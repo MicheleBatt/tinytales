@@ -1,8 +1,13 @@
 # Chi legge davvero le statistiche dei post su una pagina social. Un lettore per piattaforma,
-# come per la pubblicazione (SocialPublishers): ognuno traduce i nomi delle sue metriche in views e reach.
+# come per la pubblicazione (SocialPublishers): ognuno traduce i nomi delle sue metriche in views, reach e reazioni.
 module SocialMetrics
-  # I totali di una pubblicazione dal momento in cui è uscita.
-  Reading = Data.define(:views, :reach)
+  # I totali di una pubblicazione dal momento in cui è uscita: visualizzazioni, persone raggiunte, reazioni
+  # (il totale, nil se il social non le ha date) e il loro dettaglio per tipo ({ "like" => 19, "love" => 2 }).
+  Reading = Data.define(:views, :reach, :reactions, :reactions_by_type) do
+    def initialize(views:, reach:, reactions: nil, reactions_by_type: {})
+      super
+    end
+  end
 
   # L'esito di una lettura:
   # - readings: { publication_id => Reading } per le pubblicazioni lette;

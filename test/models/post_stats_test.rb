@@ -48,6 +48,22 @@ class PostStatsTest < ActiveSupport::TestCase
     assert_nil PostStats.change(PostStats.series([ @post.id ])[@post.id], :views)
   end
 
+  test "le reazioni si sommano sui social, tipo per tipo; le letture senza reazioni non contano" do
+    PublicationMetric.record!(@facebook, views: 100, reach: 40, at: Time.zone.local(2026, 11, 25, 10)) # prima delle reazioni
+    PublicationMetric.record!(@facebook, views: 150, reach: 50, reactions: 21, reactions_by_type: { "like" => 19, "love" => 2 },
+                                         at: Time.zone.local(2026, 11, 26, 10))
+    PublicationMetric.record!(@instagram, views: 30, reach: 10, reactions: 4, reactions_by_type: { "like" => 3, "haha" => 1 },
+                                          at: Time.zone.local(2026, 11, 26, 10))
+
+    totals = PostStats.latest([ @post.id ])[@post.id]
+    assert_equal [ 25, { "like" => 22, "love" => 2, "haha" => 1 } ], [ totals.reactions, totals.reactions_by_type ]
+
+    points = PostStats.series([ @post.id ])[@post.id]
+    assert_equal [ nil, 25 ], points.map(&:reactions)
+    assert_nil PostStats.change(points, :reactions), "il giorno prima le reazioni non c'erano"
+    assert_equal [ 80, Date.new(2026, 11, 25) ], PostStats.change(points, :views)
+  end
+
   test "si mostrano solo per i post pubblicati" do
     assert PostStats.shown?(@post)
     assert_not PostStats.shown?(posts(:mensa))

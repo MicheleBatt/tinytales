@@ -1,3 +1,4 @@
-<%# Visualizzazioni e persone raggiunte di un post nell'elenco: una colonna nella vista a lista, un badge sopra
-    la copertina nella vista a griglia (lo decide il CSS). Vuoto se il post non ha statistiche. Locals: post, totals. %>
-<span class="riga-metriche" id="metriche-<%= post.id %>" role="cell"><% if totals && PostStats.shown?(post) %><span class="metrica" title="Visualizzazioni"><%= stats_icon(:views) %><span class="metrica-numero"><%= stats_number(totals.views) %></span><span class="solo-lettori"> visualizzazioni</span></span><span class="metrica" title="Persone raggiunte"><%= stats_icon(:reach) %><span class="metrica-numero"><%= stats_number(totals.reach) %></span><span class="solo-lettori"> persone raggiunte</span></span><% end %></span>
+<%# Visualizzazioni, persone raggiunte e reazioni di un post nell'elenco: una colonna nella vista a lista, un'etichetta
+    sopra la copertina nella vista a griglia (lo decide il CSS). Vuoto se il post non ha statistiche; le reazioni mancano
+    finché nessuna lettura le ha. Locals: post, totals. %>
+<span class="riga-metriche" id="metriche-<%= post.id %>" role="cell"><% if totals && PostStats.shown?(post) %><% PostStats::KINDS.each do |kind| %><% next if (value = totals.public_send(kind)).nil? %><% label = PostStatsHelper::STATS_LABELS.fetch(kind) %><span class="metrica" title="<%= label %>"><%= stats_icon(kind) %><span class="metrica-numero"><%= stats_number(value) %></span><span class="solo-lettori"> <%= label.downcase %></span></span><% end %><% end %></span>

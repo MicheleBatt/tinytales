@@ -32,6 +32,62 @@ class PostMetricsControllerTest < ActionDispatch::IntegrationTest
     assert_empty @facebook.batches
   end
 
+  def save_readings_with_reactions
+    save_readings
+    PublicationMetric.record!(@open_day, views: 1000, reach: 350, reactions: 21, reactions_by_type: { "love" => 2, "like" => 19 },
+                                         at: Time.zone.local(2026, 11, 16, 9))
+  end
+
+  test "con le reazioni: terza misura in elenco, riquadro con il dettaglio per tipo e terzo grafico nella pagina" do
+    save_readings_with_reactions
+    get posts_path(vista: "lista")
+    assert_select "#metriche-#{@post.id} .metrica[title=Reazioni] .metrica-numero", text: "21"
+
+    get post_path(@post)
+    assert_select "#statistiche-#{@post.id} .statistica-reactions" do
+      assert_select ".statistica-etichetta", text: "REAZIONI"
+      assert_select ".statistica-numero", text: "21"
+      assert_select ".statistica-tipi span[title='Mi piace']", text: "👍 19"
+      assert_select ".statistica-tipi span[title=Love]", text: "❤️ 2"
+    end
+    assert_select "#statistiche-#{@post.id} .statistica-reactions .statistica-variazione", count: 0, message: "il giorno prima non c'erano"
+    assert_select "#grafici-#{@post.id} figure.grafico", count: 3
+    assert_select "#grafici-#{@post.id} figcaption", text: "Reazioni"
+  end
+
+  test "senza reazioni lette, la terza misura e il terzo grafico non compaiono" do
+    save_readings
+    get post_path(@post)
+    assert_select ".statistica-reactions", count: 0
+    assert_select "#grafici-#{@post.id} figure.grafico", count: 2
+    get posts_path(vista: "lista")
+    assert_select "#metriche-#{@post.id} .metrica[title=Reazioni]", count: 0
+  end
+
+  test "l'elenco si ordina anche per reazioni; il report le mostra con il dettaglio" do
+    save_readings_with_reactions
+    other = Post.create!(title: "Altro pubblicato", body: "Testo", status: :published, publish_at: Time.zone.local(2026, 11, 10, 9))
+    other_publication = Publication.create!(post: other, social_page: social_pages(:facebook), remote_id: "1234_777", remote_kind: "feed")
+    PublicationMetric.record!(other_publication, views: 5, reach: 5, reactions: 40, at: Time.zone.local(2026, 11, 16, 9))
+
+    titles = ->(sort) { get posts_path(vista: "lista", q: { s: sort }); css_select(".riga h3").map(&:text) }
+    assert_equal [ other.title, @post.title ], titles.("reactions desc").first(2)
+    assert_equal [ @post.title, other.title ], titles.("reactions asc").first(2)
+    assert_select "#q_s option", text: "Più reazioni"
+
+    printed = []
+    PostsReport.printer = ->(html, pdf_path) { printed << File.read(html); File.write(pdf_path, "%PDF-1.4 finto") }
+    PostsReport.text_of = ->(_pdf) { [] }
+    get report_posts_path
+    card = Nokogiri::HTML(printed.last).css(".scheda").find { |section| section.at_css("h2").text == @post.title }
+    assert_equal [ "VISUALIZZAZIONI", "PERSONE RAGGIUNTE", "REAZIONI" ], card.css(".statistica .etichetta").map { |e| e.text.strip }
+    assert_equal [ "👍 19", "❤️ 2" ], card.css(".statistica .tipi span").map(&:text)
+    assert_equal 3, card.css(".grafici svg.trend-chart").size
+  ensure
+    PostsReport.printer = nil
+    PostsReport.text_of = nil
+  end
+
   test "i post non pubblicati non hanno numeri né letture" do
     save_readings
     get posts_path(q: { status_eq: "draft" })

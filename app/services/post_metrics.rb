@@ -1,4 +1,4 @@
-# Aggiorna nel database le statistiche dei post pubblicati (visualizzazioni e persone raggiunte),
+# Aggiorna nel database le statistiche dei post pubblicati (visualizzazioni, persone raggiunte e reazioni),
 # leggendole dai social. Si usa quando si apre l'elenco dei post, un post o il popup del calendario
 # (lo chiede il browser dopo il caricamento: PostsController#stats) e prima di preparare il report in PDF.
 #
@@ -46,7 +46,8 @@ class PostMetrics
 
     by_id = publications.index_by(&:id)
     result.readings.each do |id, reading|
-      PublicationMetric.record!(by_id.fetch(id), views: reading.views, reach: reading.reach, at: @now)
+      PublicationMetric.record!(by_id.fetch(id), views: reading.views, reach: reading.reach, reactions: reading.reactions,
+                                                reactions_by_type: reading.reactions_by_type, at: @now)
     end
     brake(page, result)
     result.errors.each { |error| Rails.logger.warn("[statistiche #{page.platform_label}] #{error}") }

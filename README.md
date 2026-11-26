@@ -104,7 +104,9 @@ un ruolo sull'app. Basta l'accesso standard, senza revisione di Meta, perché se
 2. In **Impostazioni app → Di base** copia l'**ID app** e la **chiave segreta**.
 3. Apri il [Graph API Explorer](https://developers.facebook.com/tools/explorer/), scegli l'app, poi
    **Token d'accesso utente** con i permessi `pages_show_list`, `business_management`, `pages_read_engagement`,
-   `pages_manage_posts` e `read_insights` (quest'ultimo serve per le statistiche dei post).
+   `pages_manage_posts`, `read_insights` e `pages_read_user_content` (gli ultimi due servono per le statistiche dei post:
+   visualizzazioni e persone, reazioni). Se nel Graph API Explorer un permesso non compare, va prima aggiunto all'app:
+   Casi d'uso → «Gestisci tutto sulla tua Pagina» → Personalizza.
    `public_profile` Facebook lo aggiunge da sé. Servono **tutti**: un token senza uno di questi lo perde.
    `publish_video` non è disponibile, ma non serve: i video si pubblicano lo stesso.
    Nella finestra di Facebook seleziona la pagina della scuola. Copia il token generato.
@@ -122,7 +124,18 @@ alla pagina o rimuovi l'app: in quel caso basta rifare `social:facebook:connect`
 
 La versione delle Graph API è `v26.0`; si cambia con la variabile `FACEBOOK_GRAPH_VERSION`.
 
-### Statistiche dei post (visualizzazioni e persone raggiunte)
+### Statistiche dei post (visualizzazioni, persone raggiunte e reazioni)
+
+**Reazioni** (dal 26/11/2026): nella stessa richiesta, per ogni post, l'app legge anche il campo `reactions` del post,
+con il totale e un conteggio per tipo (LIKE, LOVE, CARE, HAHA, WOW, SAD, ANGRY). Sono gli stessi numeri che si vedono
+sotto il post; serve il permesso `pages_read_user_content`. La metrica degli insights `post_reactions_by_type_total`
+non va usata, perché conta le azioni di reazione, comprese quelle sulle condivisioni e quelle tolte: per «Benvenuti»
+dava 21 contro i 14 visibili. Si salvano il totale in `total_reactions` e il dettaglio in `reactions_by_type`
+(`{"like" => 12, "love" => 2}`). Le reazioni compaiono come terza misura «Reazioni» in tutte le pagine e nel report:
+nella pagina del post, nel popup e nel PDF anche con il dettaglio per tipo (👍 12 · ❤️ 2), con un terzo grafico
+dell'andamento e con l'ordinamento «Più/Meno reazioni». Le letture salvate prima non hanno reazioni (nil): quei giorni
+restano fuori dal grafico e dall'aumento giornaliero. Con due letture per post, una batch contiene 25 post.
+
 
 Per ogni post pubblicato l'app salva le **visualizzazioni** (`post_media_view`) e le **persone raggiunte**
 (`post_total_media_view_unique`) nella tabella `publication_metrics`. C'è una riga per pubblicazione e per giorno

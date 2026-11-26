@@ -12,14 +12,18 @@ class FakeFacebookClient
     @failures = []
     @batches = []
     @insights = {}
+    @reactions = {}
     @gets = {}
   end
 
-  # Le statistiche che Facebook darà per un id: insights("1234_999", views: 10, reach: 4),
+  # Le statistiche che Facebook darà per un id: insights("1234_999", views: 10, reach: 4, reactions: { "like" => 3 }),
   # oppure un errore: insights("1234_999", error: FacebookGraph::Error.new(...)).
-  def insights(id, views: nil, reach: nil, error: nil)
+  # reactions sono le reazioni sul post (lettura del campo reactions): senza, quella lettura dà un corpo vuoto;
+  # reactions_error la fa fallire.
+  def insights(id, views: nil, reach: nil, reactions: nil, error: nil, reactions_error: nil)
     @insights[id] = error || { "data" => [ { "name" => "post_media_view", "values" => [ { "value" => views } ] },
                                          { "name" => "post_total_media_view_unique", "values" => [ { "value" => reach } ] } ] }
+    @reactions[id] = reactions_error || (reactions && reactions_field(reactions))
   end
 
   # La risposta di una lettura semplice: respond_to_get("video_1", { "post_id" => "77" }).
@@ -31,7 +35,10 @@ class FakeFacebookClient
   def batch(paths)
     @batches << paths
     record(:batch, "", { paths: })
-    paths.map { |path| @insights.fetch(path[%r{\A[^/?]+}], {}) }
+    paths.map do |path|
+      id = path[%r{\A[^/?]+}]
+      path.include?("/insights") ? @insights.fetch(id, {}) : (@reactions[id] || {})
+    end
   end
 
   # Fa fallire le chiamate che corrispondono: fail_on(:post, %r{/feed\z}, "Errore finto").
@@ -64,6 +71,13 @@ class FakeFacebookClient
   end
 
   private
+
+  # Come risponde Facebook al campo reactions con i totali per tipo (alias totale, like, love…).
+  def reactions_field(counts)
+    types = %w[like love care haha wow sad angry]
+    { "totale" => { "summary" => { "total_count" => counts.values.sum } } }
+      .merge(types.to_h { |type| [ type, { "summary" => { "total_count" => counts.fetch(type, 0) } } ] })
+  end
 
   def record(method, path, params = {}, files = {}, video = false)
     @calls << Call.new(method:, path:, params:, files:, video:)

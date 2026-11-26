@@ -18,7 +18,31 @@ class PostMetricsTest < ActiveSupport::TestCase
     assert_equal [ 916, 320, Date.new(2026, 11, 25), Time.current, "1234_999" ],
                  [ metric.total_views, metric.total_reach, metric.measured_on, metric.measured_at, metric.remote_id ]
     # promemoria è solo programmato, mensa e festa sono bozze: nessuna lettura per loro
-    assert_equal [ [ "1234_999/insights?metric=post_media_view,post_total_media_view_unique&period=lifetime" ] ], @facebook.batches
+    assert_equal [ "1234_999/insights?metric=post_media_view,post_total_media_view_unique&period=lifetime",
+                   "1234_999?fields=#{SocialMetrics::Facebook::REACTIONS_FIELDS}" ], @facebook.batches.sole
+  end
+
+  test "le reazioni si leggono dal post, nella stessa richiesta: il totale e il dettaglio per tipo; senza reazioni zero" do
+    @facebook.insights("1234_999", views: 455, reach: 218, reactions: { "like" => 12, "love" => 2 })
+    PostMetrics.refresh(all_publications)
+
+    metric = @open_day.metrics.sole
+    assert_equal [ 14, { "like" => 12, "love" => 2 } ], [ metric.total_reactions, metric.reactions_by_type ]
+    insights_path, reactions_path = @facebook.batches.sole
+    assert_equal "1234_999/insights?metric=post_media_view,post_total_media_view_unique&period=lifetime", insights_path
+    assert_match(/\A1234_999\?fields=reactions\.limit\(0\)\.summary\(total_count\)\.as\(totale\),reactions\.type\(LIKE\)/, reactions_path)
+
+    travel 2.minutes
+    @facebook.insights("1234_999", views: 460, reach: 219, reactions: {})
+    PostMetrics.refresh(all_publications)
+    assert_equal [ 0, {} ], [ @open_day.metrics.sole.total_reactions, @open_day.metrics.sole.reactions_by_type ]
+  end
+
+  test "se le reazioni non si possono leggere, visualizzazioni e persone si salvano lo stesso" do
+    @facebook.insights("1234_999", views: 455, reach: 218,
+                                   reactions_error: FacebookGraph::Error.new("Facebook: (#10) permesso mancante", code: 10))
+    assert_equal 1, PostMetrics.refresh(all_publications)
+    assert_equal [ 455, nil ], [ @open_day.metrics.sole.total_views, @open_day.metrics.sole.total_reactions ]
   end
 
   test "un post letto meno di un minuto fa non si rilegge" do
@@ -86,7 +110,7 @@ class PostMetricsTest < ActiveSupport::TestCase
     assert_nil @page.reload.metrics_paused_until
   end
 
-  test "oltre 50 post servono più batch" do
+  test "oltre 25 post (50 letture) servono più batch" do
     post = posts(:open_day)
     publications = Array.new(51) do |i|
       Publication.new(id: 10_000 + i, post:, social_page: @page, remote_id: "1234_#{i}", remote_kind: "feed")
@@ -94,7 +118,7 @@ class PostMetricsTest < ActiveSupport::TestCase
     publications.each { |p| @facebook.insights(p.remote_id, views: 1, reach: 1) }
 
     result = SocialMetrics::Facebook.new(@page).read(publications)
-    assert_equal [ 1, 50 ], @facebook.batches.map(&:size).sort # partono insieme: l'ordine è casuale
+    assert_equal [ 2, 50, 50 ], @facebook.batches.map(&:size).sort # partono insieme: l'ordine è casuale
     assert_equal 51, result.readings.size
   end
 end

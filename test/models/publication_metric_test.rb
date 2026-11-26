@@ -52,6 +52,16 @@ class PublicationMetricTest < ActiveSupport::TestCase
     assert_equal 900, @publication.metrics.sole.daily_views
   end
 
+  test "le reazioni del giorno: la differenza, ma solo se anche la lettura precedente le ha" do
+    PublicationMetric.record!(@publication, views: 100, reach: 40, at: Time.zone.local(2026, 11, 24, 10))
+    PublicationMetric.record!(@publication, views: 150, reach: 50, reactions: 10, at: Time.zone.local(2026, 11, 25, 10))
+    PublicationMetric.record!(@publication, views: 180, reach: 60, reactions: 14, at: Time.zone.local(2026, 11, 26, 10))
+    by_day = @publication.metrics.index_by(&:measured_on)
+    assert_nil by_day[Date.new(2026, 11, 25)].daily_reactions
+    assert_equal 4, by_day[Date.new(2026, 11, 26)].daily_reactions
+    assert_nil by_day[Date.new(2026, 11, 24)].daily_reactions
+  end
+
   test "se il post è stato ripubblicato la differenza non si fa" do
     PublicationMetric.record!(@publication, views: 400, reach: 200, at: Time.zone.local(2026, 11, 24, 10))
     @publication.update!(remote_id: "1234_777")

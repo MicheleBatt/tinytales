@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_25_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_26_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -101,8 +101,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_25_160000) do
     t.datetime "measured_at", null: false
     t.date "measured_on", null: false
     t.bigint "publication_id", null: false
+    t.jsonb "reactions_by_type", default: {}, null: false
     t.string "remote_id", null: false
     t.integer "total_reach", null: false
+    t.integer "total_reactions"
     t.integer "total_views", null: false
     t.datetime "updated_at", null: false
     t.index ["publication_id", "measured_on"], name: "index_publication_metrics_on_publication_id_and_measured_on", unique: true

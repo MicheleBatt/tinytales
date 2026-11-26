@@ -1,4 +1,5 @@
-<%# L'andamento di visualizzazioni e persone raggiunte di un post pubblicato, un grafico ciascuna, ognuno nel suo riquadro.
+<%# L'andamento di visualizzazioni, persone raggiunte e reazioni di un post pubblicato, un grafico ciascuna, ognuno nel
+    suo riquadro. Il grafico delle reazioni c'è appena una lettura le ha (si leggono dal 26/11/2026).
     Locals: post, points ([PostStats::Point]), contesto ("pagina": affiancati; "popup": uno sotto l'altro). %>
 <% if PostStats.shown?(post) %>
   <% popup = contesto == "popup" %>
@@ -17,12 +18,13 @@
     </div>
     <% if points.any? %>
       <div class="grafici-coppia">
-        <% %i[views reach].each do |kind| %>
+        <% PostStats::KINDS.each do |kind| %>
+          <% next if points.none? { |point| point.public_send(kind) } %>
           <figure class="grafico">
             <figcaption>
               <span class="grafico-icona"><%= stats_icon(kind) %></span><%= PostStatsHelper::STATS_LABELS.fetch(kind) %>
             </figcaption>
-            <%= stats_chart(points, kind, width: popup ? 640 : 560, height: popup ? 160 : 190) %>
+            <%= stats_chart(points, kind, width: popup ? 640 : 370, height: popup ? 150 : 190) %>
           </figure>
         <% end %>
       </div>
