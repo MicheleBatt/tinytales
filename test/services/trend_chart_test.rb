@@ -26,7 +26,7 @@ class TrendChartTest < ActiveSupport::TestCase
 
   test "l'asse dei tempi è proporzionale: i giorni senza lettura restano spazi" do
     points = [ [ Date.new(2026, 11, 1), 10 ], [ Date.new(2026, 11, 2), 20 ], [ Date.new(2026, 11, 11), 30 ] ]
-    xs = svg(TrendChart.new(points, label: "visualizzazioni")).at_css("polyline")["points"].split.map { |p| p.split(",").first.to_f }
+    xs = svg(TrendChart.new(points, label: "visualizzazioni")).css("circle:not(.tc-guide)").map { |dot| dot["cx"].to_f }
     assert_in_delta 9.0, (xs[2] - xs[1]) / (xs[1] - xs[0]), 0.01
   end
 
@@ -45,7 +45,7 @@ class TrendChartTest < ActiveSupport::TestCase
   end
 
   test "in un grafico stretto i pallini troppo vicini spariscono, resta l'ultimo" do
-    narrow = svg(TrendChart.new(days(20), label: "visualizzazioni", width: 330))
+    narrow = svg(TrendChart.new(days(20), label: "visualizzazioni", width: 280))
     assert_equal 1, narrow.css("circle:not(.tc-guide)").size
     wide = svg(TrendChart.new(days(20), label: "visualizzazioni", width: 660))
     assert_equal 20, wide.css("circle:not(.tc-guide)").size
@@ -55,7 +55,34 @@ class TrendChartTest < ActiveSupport::TestCase
     doc = svg(TrendChart.new([ [ Date.new(2026, 11, 25), 1234 ] ], label: "visualizzazioni"))
     assert_equal [ "mer 25 nov 2026 · 1.234 visualizzazioni" ], doc.css(".tc-hit title").map(&:text)
     assert_match(/1\.234 alla lettura del 25 novembre 2026/, doc.at_css("svg")["aria-label"])
-    assert_nil doc.at_css("polyline"), "con una sola lettura non c'è linea"
+    assert_nil doc.at_css(".tc-line"), "con una sola lettura non c'è linea"
+  end
+
+  test "la linea è una curva che non esce dai valori letti" do
+    points = [ [ Date.new(2026, 11, 1), 10 ], [ Date.new(2026, 11, 2), 100 ], [ Date.new(2026, 11, 3), 100 ],
+               [ Date.new(2026, 11, 4), 120 ] ]
+    chart = TrendChart.new(points, label: "visualizzazioni")
+    doc = svg(chart)
+    path = doc.at_css(".tc-line")["d"]
+    assert_equal 3, path.scan("C").size, "un arco per ogni tratto"
+    ys = path.scan(/-?\d+\.\d/).each_slice(2).map { |_, yy| yy.to_f }
+    dots = doc.css("circle:not(.tc-guide)").map { |dot| dot["cy"].to_f }
+    assert ys.all? { |yy| yy.between?(dots.min - 0.05, dots.max + 0.05) }, "nessuna gobba oltre il minimo o il massimo"
+    flat = path.split("C")[2].split.map { |pair| pair.split(",").last.to_f }
+    assert flat.all? { |yy| (yy - dots[1]).abs < 0.05 }, "dove il valore non cambia la curva resta piatta"
+  end
+
+  test "sopra ogni pallino c'è il suo valore, se c'è posto" do
+    doc = svg(TrendChart.new(days(5), label: "visualizzazioni", width: 560))
+    values = doc.css("text").map(&:text)
+    days(5).each { |_, value| assert_includes values, TrendChart.number(value) }
+
+    big = Array.new(20) { |i| [ Date.new(2026, 11, 1) + i, 12_000 + i * 10 ] }
+    crowded = svg(TrendChart.new(big, label: "visualizzazioni", width: 660))
+    labels = crowded.css("text[text-anchor='middle'][paint-order]").map(&:text)
+    assert_includes labels, TrendChart.number(big.last.last), "l'ultimo c'è sempre"
+    assert_includes labels, TrendChart.number(big.first.last), "il primo c'è sempre"
+    assert_operator labels.size, :<, 20, "quelli che si accavallerebbero restano fuori"
   end
 
   test "numeri all'italiana" do

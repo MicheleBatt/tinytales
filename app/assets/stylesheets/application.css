@@ -157,7 +157,7 @@ h1, h2, h3 { font-family: var(--titoli); font-weight: 600; line-height: 1.25; te
 .elenco-post { background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--raggio); overflow: hidden; box-shadow: var(--ombra); }
 .elenco-testa, .riga {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 150px 120px 110px 92px;
+  grid-template-columns: 64px minmax(0, 1fr) 150px 120px 110px 150px;
   gap: 14px;
   align-items: center;
   padding: 8px 14px;
@@ -224,16 +224,17 @@ h1, h2, h3 { font-family: var(--titoli); font-weight: 600; line-height: 1.25; te
 .vista-griglia .riga-stato { grid-area: stato; justify-self: start; }
 .vista-griglia .riga-pagine { grid-area: pagine; justify-content: flex-end; }
 
-/* Visualizzazioni e persone raggiunte. Lista: una colonna, un numero per riga con la sua icona.
+/* Visualizzazioni, persone raggiunte, reazioni e condivisioni. Lista: due colonne affiancate, visualizzazioni e persone
+   a sinistra, reazioni e condivisioni a destra, un numero per riga con la sua icona.
    Griglia: un'etichetta chiara e discreta in alto a sinistra sopra la copertina, che lascia passare il clic all'anteprima sotto. */
 .solo-lettori { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .icona-statistica { flex: 0 0 auto; display: block; }
-.riga-metriche { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
+.riga-metriche { display: grid; grid-template-rows: auto auto; grid-auto-flow: column; justify-content: start; gap: 3px 14px; font-size: 12.5px; }
 .riga-metriche:empty { display: none; }
 .metrica { display: inline-flex; align-items: center; gap: 5px; color: var(--tenue); }
 .metrica-numero { font-family: var(--mono); font-size: 12px; color: var(--inchiostro); }
 .vista-griglia .riga-metriche { grid-area: foto; align-self: start; justify-self: start; position: relative; z-index: 1; margin: 6px;
-                                flex-direction: row; gap: 7px; padding: 1px 6px; border-radius: 4px; font-size: 11px;
+                                display: flex; flex-direction: row; gap: 7px; padding: 1px 6px; border-radius: 4px; font-size: 11px;
                                 background: rgba(255, 255, 255, 0.82); backdrop-filter: blur(3px);
                                 box-shadow: 0 0 0 1px rgba(29, 34, 48, 0.06); pointer-events: none; }
 .vista-griglia .metrica { gap: 3px; }
@@ -943,7 +944,7 @@ span.scaricabile { display: block; }
   .riga-data { grid-area: data; flex-direction: row; gap: 8px; align-items: baseline; }
   .riga-pagine { grid-area: pagine; justify-self: end; }
   .riga { grid-template-areas: "foto testo stato" "foto data pagine" "foto metriche metriche"; }
-  .riga-metriche { grid-area: metriche; flex-direction: row; gap: 12px; }
+  .riga-metriche { grid-area: metriche; display: flex; flex-direction: row; gap: 12px; }
   .grafici-coppia { grid-template-columns: minmax(0, 1fr); }
 }
 
